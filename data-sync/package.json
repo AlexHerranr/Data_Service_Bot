@@ -19,7 +19,9 @@
     "sync:leads": "tsx scripts/backfill.ts -- --type leads",
     "monitor": "tsx scripts/monitor.ts",
     "monitor:continuous": "tsx scripts/monitor.ts -- --continuous",
-    "monitor:json": "tsx scripts/monitor.ts -- --format json"
+    "monitor:json": "tsx scripts/monitor.ts -- --format json",
+    "typecheck": "npx tsc --noEmit",
+    "test-build": "npm run typecheck && npm run build"
   },
   "dependencies": {
     "@bull-board/express": "^6.12.0",

@@ -18,10 +18,11 @@ export function registerTablesRoute(router: Router): void {
       const { limit = '50', offset = '0', ...filters } = req.query;
       
       if (!isValidTable(tableName)) {
-        return res.status(400).json({ 
+        res.status(400).json({ 
           error: 'Invalid table name',
           validTables: VALID_TABLES 
         });
+        return;
       }
       
       const limitNum = Math.min(parseInt(limit as string) || 50, 100);
@@ -67,10 +68,11 @@ export function registerTablesRoute(router: Router): void {
       const { tableName, id } = req.params;
       
       if (!isValidTable(tableName)) {
-        return res.status(400).json({ 
+        res.status(400).json({ 
           error: 'Invalid table name',
           validTables: VALID_TABLES 
         });
+        return;
       }
       
       logger.debug({ tableName, id }, 'Fetching record by ID');
@@ -81,7 +83,8 @@ export function registerTablesRoute(router: Router): void {
       });
       
       if (!data) {
-        return res.status(404).json({ error: 'Record not found' });
+        res.status(404).json({ error: 'Record not found' });
+        return;
       }
       
       res.json(data);
@@ -99,14 +102,16 @@ export function registerTablesRoute(router: Router): void {
       const data = req.body;
       
       if (!isValidTable(tableName)) {
-        return res.status(400).json({ 
+        res.status(400).json({ 
           error: 'Invalid table name',
           validTables: VALID_TABLES 
         });
+        return;
       }
       
       if (!data || Object.keys(data).length === 0) {
-        return res.status(400).json({ error: 'Request body cannot be empty' });
+        res.status(400).json({ error: 'Request body cannot be empty' });
+        return;
       }
       
       logger.debug({ tableName, data }, 'Creating new record');
@@ -120,7 +125,8 @@ export function registerTablesRoute(router: Router): void {
       logger.error({ error: error.message, tableName: req.params.tableName }, 'Failed to create record');
       
       if (error.code === 'P2002') {
-        return res.status(409).json({ error: 'Record with this key already exists' });
+        res.status(409).json({ error: 'Record with this key already exists' });
+        return;
       }
       
       res.status(500).json({ error: 'Internal server error' });
@@ -134,14 +140,16 @@ export function registerTablesRoute(router: Router): void {
       const data = req.body;
       
       if (!isValidTable(tableName)) {
-        return res.status(400).json({ 
+        res.status(400).json({ 
           error: 'Invalid table name',
           validTables: VALID_TABLES 
         });
+        return;
       }
       
       if (!data || Object.keys(data).length === 0) {
-        return res.status(400).json({ error: 'Request body cannot be empty' });
+        res.status(400).json({ error: 'Request body cannot be empty' });
+        return;
       }
       
       logger.debug({ tableName, id, data }, 'Updating record');
@@ -158,7 +166,8 @@ export function registerTablesRoute(router: Router): void {
       logger.error({ error: error.message, tableName: req.params.tableName, id: req.params.id }, 'Failed to update record');
       
       if (error.code === 'P2025') {
-        return res.status(404).json({ error: 'Record not found' });
+        res.status(404).json({ error: 'Record not found' });
+        return;
       }
       
       res.status(500).json({ error: 'Internal server error' });
@@ -171,19 +180,21 @@ export function registerTablesRoute(router: Router): void {
       const { tableName, id } = req.params;
       
       if (!isValidTable(tableName)) {
-        return res.status(400).json({ 
+        res.status(400).json({ 
           error: 'Invalid table name',
           validTables: VALID_TABLES 
         });
+        return;
       }
       
       // PROTECCIÓN: Solo permitir DELETE en desarrollo
       if (process.env.NODE_ENV === 'production') {
         logger.warn({ tableName, id, action: 'DELETE_BLOCKED' }, '🚫 DELETE blocked in production');
-        return res.status(403).json({ 
+        res.status(403).json({ 
           error: 'DELETE operations are disabled in production for safety',
           suggestion: 'Use PATCH to update status instead of deleting'
         });
+        return;
       }
       
       logger.warn({ tableName, id, action: 'DELETE_ATTEMPT' }, '⚠️ DELETE record attempt');
@@ -196,7 +207,8 @@ export function registerTablesRoute(router: Router): void {
       });
       
       if (!existing) {
-        return res.status(404).json({ error: 'Record not found' });
+        res.status(404).json({ error: 'Record not found' });
+        return;
       }
       
       await model.delete({
@@ -211,11 +223,13 @@ export function registerTablesRoute(router: Router): void {
       logger.error({ error: error.message, tableName: req.params.tableName, id: req.params.id }, 'Failed to delete record');
       
       if (error.code === 'P2025') {
-        return res.status(404).json({ error: 'Record not found' });
+        res.status(404).json({ error: 'Record not found' });
+        return;
       }
       
       if (error.code === 'P2003') {
-        return res.status(409).json({ error: 'Cannot delete record with foreign key references' });
+        res.status(409).json({ error: 'Cannot delete record with foreign key references' });
+        return;
       }
       
       res.status(500).json({ error: 'Internal server error' });

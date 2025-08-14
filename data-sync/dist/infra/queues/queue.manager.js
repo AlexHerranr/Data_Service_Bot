@@ -96,9 +96,9 @@ export const beds24Worker = new Worker('beds24-sync', async (job) => {
     }
 }, {
     connection: redis,
-    concurrency: 5,
+    concurrency: 2,
     limiter: {
-        max: 10,
+        max: 5,
         duration: 1000,
     },
 });
@@ -129,6 +129,10 @@ beds24Worker.on('failed', async (job, err) => {
     }
 });
 beds24Worker.on('error', (err) => {
+    if (err.message && err.message.includes('Command timed out')) {
+        logger.debug({ error: err.message }, 'Worker polling timeout (benign)');
+        return;
+    }
     logger.error({ error: err.message }, 'Worker error');
 });
 export async function addWebhookJob(data, options) {

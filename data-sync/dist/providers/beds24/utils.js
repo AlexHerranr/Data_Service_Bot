@@ -170,3 +170,139 @@ export function isCancelledBooking(bookingData) {
     const bdStatus = determineBDStatus(bookingData);
     return bdStatus === 'Cancelada';
 }
+export function extractGuestName(bookingData) {
+    if (bookingData.guestFirstName && bookingData.guestName) {
+        return `${bookingData.guestFirstName} ${bookingData.guestName}`;
+    }
+    if (bookingData.guestName) {
+        return bookingData.guestName;
+    }
+    if (bookingData.firstName && bookingData.lastName) {
+        return `${bookingData.firstName} ${bookingData.lastName}`;
+    }
+    if (bookingData.firstName) {
+        return bookingData.firstName;
+    }
+    if (bookingData.reference) {
+        return bookingData.reference;
+    }
+    if (bookingData.invoiceeId) {
+        return `Guest ${bookingData.invoiceeId}`;
+    }
+    return null;
+}
+export function extractPhoneNumber(bookingData) {
+    if (bookingData.phone) {
+        return cleanPhoneNumber(bookingData.phone);
+    }
+    if (bookingData.guestPhone) {
+        return cleanPhoneNumber(bookingData.guestPhone);
+    }
+    if (bookingData.apiReference) {
+        const phoneFromApi = extractPhoneFromApiReference(bookingData.apiReference);
+        if (phoneFromApi) {
+            return phoneFromApi;
+        }
+    }
+    const phoneFromNotes = extractPhoneFromText(`${bookingData.comments || ''} ${bookingData.notes || ''}`);
+    if (phoneFromNotes) {
+        return phoneFromNotes;
+    }
+    return null;
+}
+export function extractEmail(bookingData) {
+    if (bookingData.email) {
+        return bookingData.email;
+    }
+    if (bookingData.guestEmail) {
+        return bookingData.guestEmail;
+    }
+    const emailFromText = extractEmailFromText(`${bookingData.comments || ''} ${bookingData.notes || ''}`);
+    return emailFromText;
+}
+export function combineNotes(bookingData) {
+    const notes = [];
+    if (bookingData.notes) {
+        notes.push(bookingData.notes);
+    }
+    if (bookingData.comments) {
+        notes.push(bookingData.comments);
+    }
+    if (bookingData.internalNotes) {
+        notes.push(bookingData.internalNotes);
+    }
+    if (bookingData.channel || bookingData.referer) {
+        notes.push(`Source: ${bookingData.channel || bookingData.referer}`);
+    }
+    return notes.length > 0 ? notes.join(' | ') : null;
+}
+export function calculateTotalPersons(bookingData) {
+    const adults = parseInt(bookingData.numAdult || bookingData.adults || '0') || 0;
+    const children = parseInt(bookingData.numChild || bookingData.children || '0') || 0;
+    const total = adults + children;
+    return total > 0 ? total : null;
+}
+export function determineChannel(bookingData) {
+    if (bookingData.channel) {
+        return bookingData.channel;
+    }
+    if (bookingData.referer) {
+        return bookingData.referer;
+    }
+    if (bookingData.source) {
+        return bookingData.source;
+    }
+    if (bookingData.apiSourceId || bookingData.apiSource) {
+        return mapApiSourceToChannel(bookingData.apiSourceId, bookingData.apiSource);
+    }
+    return null;
+}
+export function extractMessages(bookingData) {
+    if (bookingData.messages && Array.isArray(bookingData.messages)) {
+        return bookingData.messages.map((msg) => ({
+            id: msg.id,
+            message: msg.message,
+            time: msg.time,
+            source: msg.source,
+            read: msg.read || false,
+        }));
+    }
+    return [];
+}
+export function mapPropertyName(propertyId) {
+    const propertyMap = {
+        '1': 'Property 1',
+        '2': 'Property 2',
+    };
+    return propertyMap[String(propertyId)] || null;
+}
+function cleanPhoneNumber(phone) {
+    const cleaned = phone.replace(/[^\d+]/g, '');
+    if (!cleaned.startsWith('+')) {
+        return `+${cleaned}`;
+    }
+    return cleaned;
+}
+function extractPhoneFromApiReference(apiRef) {
+    const phoneMatch = apiRef.match(/(\+?\d{10,15})/);
+    return phoneMatch ? cleanPhoneNumber(phoneMatch[1]) : null;
+}
+function extractPhoneFromText(text) {
+    const phonePattern = /(\+?\d{1,4}[\s-]?\d{10,15})/;
+    const match = text.match(phonePattern);
+    return match ? cleanPhoneNumber(match[1]) : null;
+}
+function extractEmailFromText(text) {
+    const emailPattern = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/;
+    const match = text.match(emailPattern);
+    return match ? match[0] : null;
+}
+function mapApiSourceToChannel(apiSourceId, apiSource) {
+    const sourceMap = {
+        1: 'Booking.com',
+        2: 'Airbnb',
+        3: 'Expedia',
+        4: 'Direct',
+    };
+    return sourceMap[apiSourceId] || apiSource || 'Unknown';
+}

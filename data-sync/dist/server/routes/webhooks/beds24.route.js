@@ -7,13 +7,25 @@ function verifyHmac(req, res, next) {
 export function registerBeds24Webhook(router) {
     router.post('/webhooks/beds24', verifyHmac, async (req, res) => {
         try {
-            const { bookingId, action, status } = req.body;
-            if (!bookingId || !action) {
+            const { booking, timeStamp } = req.body;
+            if (!booking || !booking.id) {
                 res.status(400).json({
-                    error: 'Missing required fields: bookingId, action',
+                    error: 'Missing required fields: booking.id',
                     received: false
                 });
                 return;
+            }
+            const bookingId = String(booking.id);
+            const status = booking.status || 'unknown';
+            let action = 'created';
+            if (booking.cancelTime) {
+                action = 'cancelled';
+            }
+            else if (booking.modifiedTime && booking.bookingTime !== booking.modifiedTime) {
+                action = 'modified';
+            }
+            if (status && (status.toLowerCase().includes('cancel') || status.toLowerCase().includes('deleted'))) {
+                action = 'cancelled';
             }
             res.status(200).json({
                 status: 'accepted',
@@ -24,28 +36,24 @@ export function registerBeds24Webhook(router) {
                 type: 'beds24:webhook',
                 bookingId,
                 action,
-                status
-            }, 'Webhook received');
+                status,
+                propertyId: booking.propertyId,
+                arrival: booking.arrival,
+                departure: booking.departure
+            }, 'Beds24 webhook received');
             metricsHelpers.recordWebhook('beds24', action);
-            if (action === 'created' || action === 'modified' || action === 'cancelled') {
-                const job = await addWebhookJob({
-                    bookingId: String(bookingId),
-                    action,
-                    timestamp: new Date(),
-                    priority: 'high',
-                });
-                logger.info({
-                    jobId: job.id,
-                    bookingId,
-                    action
-                }, 'Webhook job queued successfully');
-            }
-            else {
-                logger.warn({
-                    bookingId,
-                    action
-                }, 'Unknown webhook action, skipping');
-            }
+            const job = await addWebhookJob({
+                bookingId: String(bookingId),
+                action,
+                timestamp: new Date(),
+                priority: action === 'cancelled' ? 'high' : 'normal',
+            });
+            logger.info({
+                jobId: job.id,
+                bookingId,
+                action,
+                status
+            }, 'Beds24 webhook job queued successfully');
         }
         catch (error) {
             logger.error({

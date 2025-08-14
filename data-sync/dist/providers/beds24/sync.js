@@ -1,44 +1,63 @@
 import { getBeds24Client } from './client.js';
-import { formatDateSimple, extractChargesAndPayments, extractInfoItems, calculateNights, determineBDStatus, shouldSyncAsLead, shouldSyncAsConfirmed, isCancelledBooking } from './utils.js';
+import { formatDateSimple, extractChargesAndPayments, extractInfoItems, calculateNights, determineBDStatus, shouldSyncAsLead, shouldSyncAsConfirmed, isCancelledBooking, extractGuestName, extractPhoneNumber, extractEmail, combineNotes, calculateTotalPersons, determineChannel, extractMessages, mapPropertyName } from './utils.js';
 import { prisma } from '../../infra/db/prisma.client.js';
 import { logger } from '../../utils/logger.js';
-export async function syncSingleBooking(bookingData) {
+export async function syncSingleBooking(bookingId) {
     try {
-        const bookingId = bookingData.bookingId?.toString();
+        logger.info({ bookingId }, 'Starting sync for booking');
+        const client = getBeds24Client();
+        const bookingData = await client.getBooking(bookingId);
+        if (!bookingData) {
+            logger.warn({ bookingId }, 'Booking not found in Beds24');
+            return { success: false, action: 'skipped', table: 'Booking' };
+        }
+        logger.debug({ bookingId, bookingData }, 'Fetched complete booking data from API');
+        return await processSingleBookingData(bookingData);
+    }
+    catch (error) {
+        logger.error({ error: error.message, bookingId }, 'Failed to sync single booking');
+        return { success: false, action: 'skipped', table: 'Booking' };
+    }
+}
+export async function processSingleBookingData(bookingData) {
+    try {
+        const bookingId = (bookingData.bookingId || bookingData.id)?.toString();
         if (!bookingId) {
-            logger.warn({ bookingData }, 'Booking missing bookingId');
+            logger.warn({ bookingData }, 'Booking missing bookingId/id');
             return { success: false, action: 'skipped', table: 'Booking' };
         }
         const { charges, payments, totalCharges, totalPayments, balance } = extractChargesAndPayments(bookingData);
         const infoItems = extractInfoItems(bookingData);
         const numNights = calculateNights(bookingData.arrival, bookingData.departure);
         const bdStatus = determineBDStatus(bookingData);
+        const guestName = extractGuestName(bookingData);
+        const phone = extractPhoneNumber(bookingData);
+        const email = extractEmail(bookingData);
         const commonData = {
             bookingId,
-            phone: bookingData.phone || null,
-            guestName: bookingData.guestFirstName && bookingData.guestName
-                ? `${bookingData.guestFirstName} ${bookingData.guestName}`
-                : (bookingData.guestName || null),
+            phone,
+            guestName,
             status: bookingData.status || null,
-            internalNotes: bookingData.notes || null,
-            propertyName: bookingData.propertyName || null,
+            internalNotes: combineNotes(bookingData),
+            propertyName: mapPropertyName(bookingData.propertyId) || bookingData.propertyName || null,
             arrivalDate: formatDateSimple(bookingData.arrival),
             departureDate: formatDateSimple(bookingData.departure),
             numNights,
-            totalPersons: parseInt(bookingData.numAdult || '0') + parseInt(bookingData.numChild || '0') || null,
+            totalPersons: calculateTotalPersons(bookingData),
             totalCharges: totalCharges.toString(),
             totalPayments: totalPayments.toString(),
             balance: balance.toString(),
             basePrice: bookingData.price || null,
-            channel: bookingData.referer || null,
-            email: bookingData.guestEmail || null,
+            channel: determineChannel(bookingData),
+            email,
             apiReference: bookingData.apiReference || null,
             charges: charges,
             payments: payments,
+            messages: extractMessages(bookingData),
             infoItems,
             notes: bookingData.comments || null,
-            bookingDate: formatDateSimple(bookingData.created),
-            modifiedDate: formatDateSimple(bookingData.modified),
+            bookingDate: formatDateSimple(bookingData.created || bookingData.bookingTime),
+            modifiedDate: formatDateSimple(bookingData.modified || bookingData.modifiedTime),
             lastUpdatedBD: new Date(),
             raw: bookingData,
             BDStatus: bdStatus,
@@ -134,7 +153,7 @@ export async function syncCancelledReservations(fromDate, toDate) {
         logger.info({ count: bookings.length }, 'Fetched cancelled bookings from Beds24');
         for (const booking of bookings) {
             result.processed++;
-            const syncResult = await syncSingleBooking(booking);
+            const syncResult = await processSingleBookingData(booking);
             if (syncResult.success) {
                 if (syncResult.action !== 'skipped') {
                     result.upserted++;
@@ -171,7 +190,7 @@ export async function syncLeadsAndConfirmed(fromDate, toDate) {
         });
         logger.info({ count: bookings.length }, 'Fetched confirmed bookings from Beds24');
         for (const booking of bookings) {
-            const syncResult = await syncSingleBooking(booking);
+            const syncResult = await processSingleBookingData(booking);
             if (syncResult.success && syncResult.action !== 'skipped') {
                 if (shouldSyncAsLead(booking)) {
                     result.leads++;
@@ -217,7 +236,7 @@ export async function processWebhook(webhookData) {
         if (webhookData.bookings && Array.isArray(webhookData.bookings)) {
             for (const booking of webhookData.bookings) {
                 try {
-                    await syncSingleBooking(booking);
+                    await processSingleBookingData(booking);
                     processed++;
                 }
                 catch (error) {
@@ -227,7 +246,7 @@ export async function processWebhook(webhookData) {
         }
         else if (webhookData.bookingId) {
             try {
-                await syncSingleBooking(webhookData);
+                await processSingleBookingData(webhookData);
                 processed++;
             }
             catch (error) {

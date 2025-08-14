@@ -6,7 +6,7 @@ export const redis = new Redis(env.REDIS_URL, {
     retryStrategy: (times) => Math.min(times * 50, 2000),
     lazyConnect: true,
     keepAlive: 30000,
-    family: 4,
+    family: 0,
     commandTimeout: 5000,
     connectTimeout: 10000,
 });
