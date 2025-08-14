@@ -123,10 +123,10 @@ export const beds24Worker = new Worker<JobData>(
   },
   {
     connection: redis,
-    concurrency: 5,
+    concurrency: 2, // Reducir concurrencia para evitar timeouts
     limiter: {
-      max: 10,
-      duration: 1000, // 10 jobs por segundo
+      max: 5,
+      duration: 1000, // 5 jobs por segundo
     },
   }
 );
@@ -162,6 +162,13 @@ beds24Worker.on('failed', async (job, err) => {
 });
 
 beds24Worker.on('error', (err) => {
+  // Filtrar timeouts benignos de BullMQ (polling vacío)
+  if (err.message && err.message.includes('Command timed out')) {
+    logger.debug({ error: err.message }, 'Worker polling timeout (benign)');
+    return;
+  }
+  
+  // Solo loguear errores reales como error
   logger.error({ error: err.message }, 'Worker error');
 });
 
