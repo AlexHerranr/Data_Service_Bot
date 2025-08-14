@@ -91,17 +91,34 @@ Beds24 → Webhook Endpoint → Queue Job → API Sync → Database Update
 }
 ```
 
-### Mapeo de Datos
-| Campo Beds24 | Campo BD | Transformación |
-|--------------|----------|----------------|
-| `booking.id` | `bookingId` | String conversion |
-| `booking.status` | `status` | Direct mapping |
-| `booking.arrival` | `arrivalDate` | Date string |
-| `booking.departure` | `departureDate` | Date string |
-| `booking.numAdult + numChild` | `totalPersons` | Sum calculation |
-| `booking.price` | `totalCharges` | String conversion |
-| `booking.propertyId` | `propertyName` | Property lookup |
-| `booking.channel` | `channel` | Direct mapping |
+### Mapeo de Datos Mejorado
+
+#### Datos Básicos de Reserva
+| Campo Beds24 | Campo BD | Transformación | Fallbacks |
+|--------------|----------|----------------|-----------|
+| `booking.id` | `bookingId` | String conversion | `bookingId` |
+| `booking.status` | `status` | Direct mapping | - |
+| `booking.arrival` | `arrivalDate` | Date string | - |
+| `booking.departure` | `departureDate` | Date string | - |
+| `booking.numAdult + numChild` | `totalPersons` | Sum calculation | `adults + children` |
+| `booking.price` | `totalCharges` | String conversion | - |
+| `booking.propertyId` | `propertyName` | Property lookup | Configurable mapping |
+
+#### Información del Huésped (Mejorada)
+| Campo Beds24 | Campo BD | Estrategias de Extracción |
+|--------------|----------|---------------------------|
+| Guest Name | `guestName` | 1. `guestFirstName + guestName`<br>2. `firstName + lastName`<br>3. `guestName`<br>4. `reference`<br>5. `Guest {invoiceeId}` |
+| Phone | `phone` | 1. `phone` (cleaned)<br>2. `guestPhone`<br>3. Extract from `apiReference`<br>4. Regex from `comments/notes`<br>5. International format (+) |
+| Email | `email` | 1. `email`<br>2. `guestEmail`<br>3. Regex from `comments/notes` |
+
+#### Información Avanzada
+| Campo | Fuente | Transformación |
+|-------|--------|----------------|
+| `internalNotes` | `combineNotes()` | Combina `notes + comments + internalNotes + channel` |
+| `channel` | `determineChannel()` | Priority: `channel > referer > source > apiSource` |
+| `messages` | `extractMessages()` | Array completo de mensajes con metadata |
+| `charges` | `extractChargesAndPayments()` | Array detallado de cargos |
+| `payments` | `extractChargesAndPayments()` | Array detallado de pagos |
 
 ## Procesamiento de Webhooks
 
@@ -140,34 +157,130 @@ const job = await addWebhookJob({
 
 ## Flujo de Sincronización
 
-### Estrategia Híbrida
-**Webhook como Trigger → API Call Completa**
+### Estrategia Híbrida Implementada
+**Webhook como Trigger → API Call Completa → Extracción Mejorada**
 
 #### Ventajas:
-- ✅ Datos completos y consistentes
-- ✅ Resiliente a fallos
-- ✅ Performance optimizada
-- ✅ Fácil debugging
+- ✅ Datos completos y consistentes de la API
+- ✅ Múltiples fallbacks para campos críticos
+- ✅ Resiliente a cambios en formato de webhook
+- ✅ Performance optimizada (response inmediato)
+- ✅ Extracción inteligente de información del huésped
 
-#### Pasos del Proceso:
-1. **Webhook recibido**: Extrae `bookingId` básico
-2. **Job encolado**: Con prioridad según tipo
-3. **API call**: `GET /v2/booking/{id}` para datos completos
-4. **Database update**: Actualiza/crea registro en BD
-5. **Metrics**: Registra métricas de proceso
+#### Pasos del Proceso Detallado:
 
-### Código de Sincronización
+1. **Webhook Trigger**:
+   ```typescript
+   // Webhook recibe payload básico
+   const { booking } = req.body;
+   const bookingId = String(booking.id);
+   const action = determineAction(booking);
+   
+   // Respuesta inmediata (200 OK)
+   res.json({ status: 'accepted' });
+   
+   // Encola job asíncrono
+   await addWebhookJob({ bookingId, action });
+   ```
+
+2. **API Call Completa**:
+   ```typescript
+   // Worker ejecuta llamada completa a API
+   export async function syncSingleBooking(bookingId: string) {
+     const client = getBeds24Client();
+     const bookingData = await client.getBooking(bookingId);
+     
+     if (!bookingData) {
+       logger.warn({ bookingId }, 'Booking not found');
+       return { success: false, action: 'skipped' };
+     }
+     
+     return await processSingleBookingData(bookingData);
+   }
+   ```
+
+3. **Extracción Mejorada**:
+   ```typescript
+   // Extracción inteligente con múltiples fallbacks
+   const guestName = extractGuestName(bookingData);
+   const phone = extractPhoneNumber(bookingData);
+   const email = extractEmail(bookingData);
+   const channel = determineChannel(bookingData);
+   const messages = extractMessages(bookingData);
+   
+   const enhancedData = {
+     bookingId,
+     guestName,
+     phone,
+     email,
+     channel,
+     messages,
+     internalNotes: combineNotes(bookingData),
+     // ... más campos
+     raw: bookingData // Payload completo para debugging
+   };
+   ```
+
+4. **Database Update**:
+   ```typescript
+   // Upsert con datos completos
+   await prisma.reservas.upsert({
+     where: { bookingId },
+     create: enhancedData,
+     update: enhancedData
+   });
+   ```
+
+5. **Logging y Metrics**:
+   ```typescript
+   logger.info({ 
+     bookingId, 
+     action,
+     guestName,
+     phone,
+     channel,
+     duration: Date.now() - startTime
+   }, 'Booking synced with enhanced data');
+   
+   metricsHelpers.recordJobComplete('webhook', startTime, 'success');
+   ```
+
+### Funciones de Extracción Implementadas
+
+#### `extractGuestName()`
 ```typescript
-// En queue.manager.ts - Worker processor
-if (data.type === 'webhook') {
-  const webhookData = data as WebhookJob;
-  await syncSingleBooking(webhookData.bookingId);
-  
-  logger.info({ 
-    bookingId: webhookData.bookingId,
-    action: webhookData.action
-  }, 'Webhook job completed');
-}
+// Múltiples estrategias de extracción
+1. guestFirstName + guestName
+2. firstName + lastName  
+3. Solo guestName
+4. reference (fallback)
+5. "Guest {invoiceeId}" (último recurso)
+```
+
+#### `extractPhoneNumber()`
+```typescript
+// Limpieza y formato internacional
+1. phone field directo
+2. guestPhone field
+3. Regex desde apiReference (ej: whatsapp_+1234567890)
+4. Regex desde comments/notes
+5. Formato internacional con +
+```
+
+#### `extractEmail()`
+```typescript
+// Extracción con validación
+1. email field directo
+2. guestEmail field
+3. Regex pattern desde texto libre
+```
+
+#### `combineNotes()`
+```typescript
+// Consolida toda la información
+- notes + comments + internalNotes
+- Información de canal/source
+- Separador: " | "
 ```
 
 ## Monitoreo y Debugging
@@ -306,10 +419,33 @@ curl https://dataservicebot-production.up.railway.app/api/admin/queues/stats
 
 ---
 
-## Próximos Pasos
+## Estado de Implementación
 
-- [ ] Implementar verificación HMAC para seguridad
-- [ ] Agregar métricas específicas por propertyId
-- [ ] Optimizar extracción de datos del huésped
-- [ ] Implementar alertas para fallos críticos
-- [ ] Documentar mapeo completo de campos
+### ✅ Completado
+- [x] **Webhook endpoint configurado y operativo**
+- [x] **Sistema híbrido implementado** (webhook trigger + API call)
+- [x] **Extracción mejorada de datos del huésped** con múltiples fallbacks
+- [x] **Funciones de utilidad robustas** para limpieza y validación
+- [x] **Mapeo completo de campos** documentado
+- [x] **Logging estructurado** con información detallada
+- [x] **Error handling robusto** con reintentos automáticos
+- [x] **Métricas básicas** implementadas
+
+### 🔄 En Progreso
+- [ ] **Testing comprehensivo** de todas las funciones de extracción
+- [ ] **Validación con datos reales** de diferentes tipos de reservas
+
+### 📋 Próximos Pasos
+- [ ] **Implementar verificación HMAC** para seguridad
+- [ ] **Agregar métricas específicas** por propertyId y channel
+- [ ] **Configurar mapeo de propiedades** específico del negocio
+- [ ] **Implementar alertas** para fallos críticos
+- [ ] **Dashboard de monitoreo** avanzado
+- [ ] **Testing de carga** para webhooks de alto volumen
+
+### 🎯 Funcionalidades Avanzadas
+- [ ] **Rate limiting** inteligente por IP/source
+- [ ] **Cache de datos** frecuentemente accedidos
+- [ ] **Webhook signing** verification
+- [ ] **Dead letter queue** monitoring con alertas
+- [ ] **Bulk data sync** optimization

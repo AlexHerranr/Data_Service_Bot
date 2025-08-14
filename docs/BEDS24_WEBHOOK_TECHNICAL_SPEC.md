@@ -123,50 +123,120 @@ export type JobData = WebhookJob | BulkSyncJob | SingleSyncJob | WhapiJob;
 
 ### Archivo: `sync.ts`
 
-#### Función Principal
+#### Función Principal Implementada
 ```typescript
-export async function syncSingleBooking(bookingId: string): Promise<void> {
+export async function syncSingleBooking(bookingId: string): Promise<{
+  success: boolean;
+  action: 'created' | 'updated' | 'skipped';
+  table: 'Booking' | 'Leads' | 'ReservationsCancelled';
+}> {
   try {
-    // 1. Fetch data from Beds24 API
-    const bookingData = await beds24Client.getBooking(bookingId);
-    
-    // 2. Transform data
-    const transformedData = transformBookingData(bookingData);
-    
-    // 3. Upsert to database
-    await prisma.reservas.upsert({
-      where: { bookingId },
-      update: transformedData,
-      create: transformedData,
-    });
-    
-    logger.info({ bookingId }, 'Booking synced successfully');
-  } catch (error) {
-    logger.error({ bookingId, error: error.message }, 'Sync failed');
-    throw error;
+    logger.info({ bookingId }, 'Starting sync for booking');
+
+    // 1. Fetch complete booking data from Beds24 API
+    const client = getBeds24Client();
+    const bookingData = await client.getBooking(bookingId);
+
+    if (!bookingData) {
+      logger.warn({ bookingId }, 'Booking not found in Beds24');
+      return { success: false, action: 'skipped', table: 'Booking' };
+    }
+
+    logger.debug({ bookingId, bookingData }, 'Fetched complete booking data from API');
+
+    // 2. Process the complete booking data with enhanced extraction
+    return await processSingleBookingData(bookingData);
+
+  } catch (error: any) {
+    logger.error({ error: error.message, bookingId }, 'Failed to sync single booking');
+    return { success: false, action: 'skipped', table: 'Booking' };
   }
 }
 ```
 
-#### Transformación de Datos
+#### Transformación de Datos Mejorada
 ```typescript
-function transformBookingData(beds24Data: any) {
+// En processSingleBookingData() - Extracción inteligente implementada
+function extractEnhancedBookingData(bookingData: any) {
+  // Enhanced guest information extraction
+  const guestName = extractGuestName(bookingData);
+  const phone = extractPhoneNumber(bookingData);
+  const email = extractEmail(bookingData);
+
+  // Enhanced booking data with more complete information
   return {
-    bookingId: String(beds24Data.id),
-    status: beds24Data.status,
-    guestName: beds24Data.guestName || beds24Data.reference,
-    phone: extractPhoneFromReference(beds24Data.apiReference),
-    propertyName: mapPropertyId(beds24Data.propertyId),
-    arrivalDate: beds24Data.arrival,
-    departureDate: beds24Data.departure,
-    totalPersons: (beds24Data.numAdult || 0) + (beds24Data.numChild || 0),
-    totalCharges: String(beds24Data.price || 0),
-    channel: beds24Data.channel,
-    bookingDate: beds24Data.bookingTime,
-    modifiedDate: beds24Data.modifiedTime,
+    bookingId: (bookingData.bookingId || bookingData.id)?.toString(),
+    phone,
+    guestName,
+    status: bookingData.status || null,
+    internalNotes: combineNotes(bookingData),
+    propertyName: mapPropertyName(bookingData.propertyId) || bookingData.propertyName,
+    arrivalDate: formatDateSimple(bookingData.arrival),
+    departureDate: formatDateSimple(bookingData.departure),
+    numNights: calculateNights(bookingData.arrival, bookingData.departure),
+    totalPersons: calculateTotalPersons(bookingData),
+    totalCharges: totalCharges.toString(),
+    totalPayments: totalPayments.toString(),
+    balance: balance.toString(),
+    basePrice: bookingData.price || null,
+    channel: determineChannel(bookingData),
+    email,
+    apiReference: bookingData.apiReference || null,
+    charges: extractChargesAndPayments(bookingData).charges,
+    payments: extractChargesAndPayments(bookingData).payments,
+    messages: extractMessages(bookingData),
+    infoItems: extractInfoItems(bookingData),
+    notes: bookingData.comments || null,
+    bookingDate: formatDateSimple(bookingData.created || bookingData.bookingTime),
+    modifiedDate: formatDateSimple(bookingData.modified || bookingData.modifiedTime),
     lastUpdatedBD: new Date(),
-    raw: beds24Data,  // Store complete payload
+    raw: bookingData, // Always store complete API response
+    BDStatus: determineBDStatus(bookingData),
   };
+}
+
+// Funciones de extracción implementadas en utils.ts
+export function extractGuestName(bookingData: any): string | null {
+  if (bookingData.guestFirstName && bookingData.guestName) {
+    return `${bookingData.guestFirstName} ${bookingData.guestName}`;
+  }
+  if (bookingData.firstName && bookingData.lastName) {
+    return `${bookingData.firstName} ${bookingData.lastName}`;
+  }
+  return bookingData.guestName || bookingData.reference || null;
+}
+
+export function extractPhoneNumber(bookingData: any): string | null {
+  // Direct phone field with cleaning
+  if (bookingData.phone) {
+    return cleanPhoneNumber(bookingData.phone);
+  }
+  
+  // Extract from API reference (WhatsApp integration)
+  if (bookingData.apiReference) {
+    const phoneFromApi = extractPhoneFromApiReference(bookingData.apiReference);
+    if (phoneFromApi) return phoneFromApi;
+  }
+  
+  // Regex extraction from comments/notes
+  const phoneFromNotes = extractPhoneFromText(
+    `${bookingData.comments || ''} ${bookingData.notes || ''}`
+  );
+  
+  return phoneFromNotes;
+}
+
+export function combineNotes(bookingData: any): string | null {
+  const notes = [];
+  
+  if (bookingData.notes) notes.push(bookingData.notes);
+  if (bookingData.comments) notes.push(bookingData.comments);
+  if (bookingData.internalNotes) notes.push(bookingData.internalNotes);
+  if (bookingData.channel || bookingData.referer) {
+    notes.push(`Source: ${bookingData.channel || bookingData.referer}`);
+  }
+  
+  return notes.length > 0 ? notes.join(' | ') : null;
 }
 ```
 
@@ -392,13 +462,28 @@ LOG_LEVEL=info
 
 ## Checklist de Implementación
 
-- [x] Webhook endpoint configurado
-- [x] Queue system operativo
-- [x] Worker processing implementado
-- [x] Error handling robusto
-- [x] Logging estructurado
-- [x] Métricas básicas
-- [ ] HMAC verification
-- [ ] Rate limiting
-- [ ] Comprehensive testing
-- [ ] Production monitoring alerts
+### ✅ Completado
+- [x] **Webhook endpoint configurado** y operativo
+- [x] **Queue system operativo** con BullMQ + Redis
+- [x] **Worker processing implementado** con sistema híbrido
+- [x] **API client robusto** con rate limiting y retry logic
+- [x] **Extracción de datos mejorada** con múltiples fallbacks
+- [x] **Error handling robusto** con dead letter queue
+- [x] **Logging estructurado** con información detallada
+- [x] **Métricas básicas** implementadas
+- [x] **Funciones de utilidad** para limpieza y validación
+- [x] **Mapeo de datos completo** documentado
+- [x] **Database upsert** con datos completos
+
+### 🔄 En Testing
+- [ ] **Testing de funciones de extracción** con datos reales
+- [ ] **Validación de diferentes tipos** de reservas
+- [ ] **Performance testing** con volumen alto
+
+### 📋 Pendientes
+- [ ] **HMAC verification** para seguridad
+- [ ] **Rate limiting** por IP/source
+- [ ] **Comprehensive testing** suite
+- [ ] **Production monitoring alerts**
+- [ ] **Property mapping** específico del negocio
+- [ ] **Dashboard de métricas** avanzado
