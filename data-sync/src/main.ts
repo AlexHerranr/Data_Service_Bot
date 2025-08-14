@@ -5,6 +5,7 @@ import { connectPrisma } from './infra/db/prisma.client.js';
 import { connectRedis } from './infra/redis/redis.client.js';
 import { registerHealthRoute } from './server/routes/health.route.js';
 import { registerBeds24Webhook } from './server/routes/webhooks/beds24.route.js';
+import { registerWhapiWebhook } from './server/routes/webhooks/whapi.route.js';
 import { registerQueuesRoute } from './server/routes/admin/queues.route.js';
 import { register } from './infra/metrics/prometheus.js';
 import { swaggerSpec } from './docs/openapi.js';
@@ -37,6 +38,7 @@ async function main() {
   const router = express.Router();
   registerHealthRoute(router);
   registerBeds24Webhook(router);
+  registerWhapiWebhook(router);
   registerQueuesRoute(router);
   
   app.use('/api', router);
@@ -82,7 +84,10 @@ async function main() {
       version: '1.0.0',
       endpoints: {
         health: '/api/health',
-        webhook: '/api/webhooks/beds24',
+        webhooks: {
+          beds24: '/api/webhooks/beds24',
+          whapi: '/api/webhooks/whapi'
+        },
         dashboard: '/api/admin/queues/ui',
         stats: '/api/admin/queues/stats',
         metrics: env.PROMETHEUS_ENABLED ? '/metrics' : null,
