@@ -21,13 +21,16 @@ export function registerTablesRoute(router) {
             logger.debug({ tableName, filters, limit: limitNum, offset: offsetNum }, 'Fetching table data');
             const model = prisma[tableName];
             const where = Object.keys(filters).length > 0 ? filters : undefined;
-            const orderByField = tableName === 'ClientView' ? 'phoneNumber' : 'id';
+            let orderBy = { id: 'desc' };
+            if (tableName === 'ClientView') {
+                orderBy = { phoneNumber: 'asc' };
+            }
             const [data, total] = await Promise.all([
                 model.findMany({
                     where,
                     take: limitNum,
                     skip: offsetNum,
-                    orderBy: { [orderByField]: 'desc' }
+                    orderBy
                 }),
                 model.count({ where })
             ]);
@@ -58,8 +61,15 @@ export function registerTablesRoute(router) {
             }
             logger.debug({ tableName, id }, 'Fetching record by ID');
             const model = prisma[tableName];
+            let whereClause;
+            if (tableName === 'ClientView') {
+                whereClause = { phoneNumber: id };
+            }
+            else {
+                whereClause = { id: parseInt(id) };
+            }
             const data = await model.findUnique({
-                where: { id: tableName === 'ClientView' ? id : parseInt(id) }
+                where: whereClause
             });
             if (!data) {
                 res.status(404).json({ error: 'Record not found' });
@@ -118,8 +128,15 @@ export function registerTablesRoute(router) {
             }
             logger.debug({ tableName, id, data }, 'Updating record');
             const model = prisma[tableName];
+            let whereClause;
+            if (tableName === 'ClientView') {
+                whereClause = { phoneNumber: id };
+            }
+            else {
+                whereClause = { id: parseInt(id) };
+            }
             const updated = await model.update({
-                where: { id: tableName === 'ClientView' ? id : parseInt(id) },
+                where: whereClause,
                 data
             });
             res.json(updated);
@@ -153,15 +170,22 @@ export function registerTablesRoute(router) {
             }
             logger.warn({ tableName, id, action: 'DELETE_ATTEMPT' }, '⚠️ DELETE record attempt');
             const model = prisma[tableName];
+            let whereClause;
+            if (tableName === 'ClientView') {
+                whereClause = { phoneNumber: id };
+            }
+            else {
+                whereClause = { id: parseInt(id) };
+            }
             const existing = await model.findUnique({
-                where: { id: tableName === 'ClientView' ? id : parseInt(id) }
+                where: whereClause
             });
             if (!existing) {
                 res.status(404).json({ error: 'Record not found' });
                 return;
             }
             await model.delete({
-                where: { id: tableName === 'ClientView' ? id : parseInt(id) }
+                where: whereClause
             });
             logger.warn({ tableName, id, deletedRecord: existing, action: 'DELETE_SUCCESS' }, '🗑️ Record deleted successfully');
             res.json({ deleted: true, id, deletedRecord: existing });

@@ -33,15 +33,18 @@ export function registerTablesRoute(router: Router): void {
       const model = (prisma as any)[tableName];
       const where = Object.keys(filters).length > 0 ? filters : undefined;
       
-      // Determinar el campo de ordenación según la tabla
-      const orderByField = tableName === 'ClientView' ? 'phoneNumber' : 'id';
+      // Configurar ordenación según la tabla
+      let orderBy: any = { id: 'desc' }; // Default para Booking, Leads, hotel_apartments
+      if (tableName === 'ClientView') {
+        orderBy = { phoneNumber: 'asc' }; // phoneNumber es string, mejor asc
+      }
       
       const [data, total] = await Promise.all([
         model.findMany({
           where,
           take: limitNum,
           skip: offsetNum,
-          orderBy: { [orderByField]: 'desc' }
+          orderBy
         }),
         model.count({ where })
       ]);
@@ -78,8 +81,17 @@ export function registerTablesRoute(router: Router): void {
       logger.debug({ tableName, id }, 'Fetching record by ID');
       
       const model = (prisma as any)[tableName];
+      
+      // Construir where clause según la tabla
+      let whereClause: any;
+      if (tableName === 'ClientView') {
+        whereClause = { phoneNumber: id }; // phoneNumber es string
+      } else {
+        whereClause = { id: parseInt(id) }; // id es number para otras tablas
+      }
+      
       const data = await model.findUnique({
-        where: { id: tableName === 'ClientView' ? id : parseInt(id) }
+        where: whereClause
       });
       
       if (!data) {
@@ -155,8 +167,17 @@ export function registerTablesRoute(router: Router): void {
       logger.debug({ tableName, id, data }, 'Updating record');
       
       const model = (prisma as any)[tableName];
+      
+      // Construir where clause según la tabla
+      let whereClause: any;
+      if (tableName === 'ClientView') {
+        whereClause = { phoneNumber: id }; // phoneNumber es string
+      } else {
+        whereClause = { id: parseInt(id) }; // id es number para otras tablas
+      }
+      
       const updated = await model.update({
-        where: { id: tableName === 'ClientView' ? id : parseInt(id) },
+        where: whereClause,
         data
       });
       
@@ -201,9 +222,17 @@ export function registerTablesRoute(router: Router): void {
       
       const model = (prisma as any)[tableName];
       
+      // Construir where clause según la tabla
+      let whereClause: any;
+      if (tableName === 'ClientView') {
+        whereClause = { phoneNumber: id }; // phoneNumber es string
+      } else {
+        whereClause = { id: parseInt(id) }; // id es number para otras tablas
+      }
+      
       // Verificar que el registro existe antes de eliminarlo
       const existing = await model.findUnique({
-        where: { id: tableName === 'ClientView' ? id : parseInt(id) }
+        where: whereClause
       });
       
       if (!existing) {
@@ -212,7 +241,7 @@ export function registerTablesRoute(router: Router): void {
       }
       
       await model.delete({
-        where: { id: tableName === 'ClientView' ? id : parseInt(id) }
+        where: whereClause
       });
       
       logger.warn({ tableName, id, deletedRecord: existing, action: 'DELETE_SUCCESS' }, '🗑️ Record deleted successfully');
