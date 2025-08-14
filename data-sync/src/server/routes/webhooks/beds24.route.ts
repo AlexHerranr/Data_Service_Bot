@@ -27,9 +27,17 @@ export function registerBeds24Webhook(router: Router): void {
       const bookingId = String(booking.id);
       const status = booking.status || 'unknown';
       // Determinar acción basada en el estado y timestamps
-      const action = booking.modifiedTime && booking.bookingTime !== booking.modifiedTime 
-        ? 'modified' 
-        : 'created';
+      let action = 'created';
+      if (booking.cancelTime) {
+        action = 'cancelled';
+      } else if (booking.modifiedTime && booking.bookingTime !== booking.modifiedTime) {
+        action = 'modified';
+      }
+      
+      // Si status indica cancelación específicamente
+      if (status && (status.toLowerCase().includes('cancel') || status.toLowerCase().includes('deleted'))) {
+        action = 'cancelled';
+      }
 
       // Respuesta inmediata para Beds24
       res.status(200).json({ 
@@ -51,26 +59,20 @@ export function registerBeds24Webhook(router: Router): void {
       // Record webhook metrics
       metricsHelpers.recordWebhook('beds24', action);
 
-      // Encolar job para procesamiento asíncrono
-      if (action === 'created' || action === 'modified' || action === 'cancelled') {
-        const job = await addWebhookJob({
-          bookingId: String(bookingId),
-          action,
-          timestamp: new Date(),
-          priority: 'high',
-        });
+      // Encolar job para procesamiento asíncrono (acepta todos los tipos)
+      const job = await addWebhookJob({
+        bookingId: String(bookingId),
+        action,
+        timestamp: new Date(),
+        priority: action === 'cancelled' ? 'high' : 'normal',
+      });
 
-        logger.info({ 
-          jobId: job.id,
-          bookingId, 
-          action 
-        }, 'Webhook job queued successfully');
-      } else {
-        logger.warn({ 
-          bookingId, 
-          action 
-        }, 'Unknown webhook action, skipping');
-      }
+      logger.info({ 
+        jobId: job.id,
+        bookingId, 
+        action,
+        status
+      }, 'Beds24 webhook job queued successfully');
       
     } catch (error: any) {
       logger.error({ 
