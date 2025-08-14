@@ -1,6 +1,12 @@
 import { logger } from '../../utils/logger.js';
 import { prisma } from '../../infra/db/prisma.client.js';
 const VALID_TABLES = ['ClientView', 'Booking', 'Leads', 'hotel_apartments'];
+const TABLE_TO_MODEL = {
+    'ClientView': 'whatsApp',
+    'Booking': 'reservas',
+    'Leads': 'prospectos',
+    'hotel_apartments': 'apartamentos'
+};
 function isValidTable(table) {
     return VALID_TABLES.includes(table);
 }
@@ -19,7 +25,8 @@ export function registerTablesRoute(router) {
             const limitNum = Math.min(parseInt(limit) || 50, 100);
             const offsetNum = parseInt(offset) || 0;
             logger.debug({ tableName, filters, limit: limitNum, offset: offsetNum }, 'Fetching table data');
-            const model = prisma[tableName];
+            const modelName = TABLE_TO_MODEL[tableName];
+            const model = prisma[modelName];
             const where = Object.keys(filters).length > 0 ? filters : undefined;
             let orderBy = { id: 'desc' };
             if (tableName === 'ClientView') {
@@ -60,7 +67,8 @@ export function registerTablesRoute(router) {
                 return;
             }
             logger.debug({ tableName, id }, 'Fetching record by ID');
-            const model = prisma[tableName];
+            const modelName = TABLE_TO_MODEL[tableName];
+            const model = prisma[modelName];
             let whereClause;
             if (tableName === 'ClientView') {
                 whereClause = { phoneNumber: id };
@@ -98,7 +106,8 @@ export function registerTablesRoute(router) {
                 return;
             }
             logger.debug({ tableName, data }, 'Creating new record');
-            const model = prisma[tableName];
+            const modelName = TABLE_TO_MODEL[tableName];
+            const model = prisma[modelName];
             const created = await model.create({ data });
             res.status(201).json(created);
         }
@@ -127,7 +136,8 @@ export function registerTablesRoute(router) {
                 return;
             }
             logger.debug({ tableName, id, data }, 'Updating record');
-            const model = prisma[tableName];
+            const modelName = TABLE_TO_MODEL[tableName];
+            const model = prisma[modelName];
             let whereClause;
             if (tableName === 'ClientView') {
                 whereClause = { phoneNumber: id };
@@ -169,7 +179,8 @@ export function registerTablesRoute(router) {
                 return;
             }
             logger.warn({ tableName, id, action: 'DELETE_ATTEMPT' }, '⚠️ DELETE record attempt');
-            const model = prisma[tableName];
+            const modelName = TABLE_TO_MODEL[tableName];
+            const model = prisma[modelName];
             let whereClause;
             if (tableName === 'ClientView') {
                 whereClause = { phoneNumber: id };
