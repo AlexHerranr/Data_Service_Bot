@@ -1,16 +1,17 @@
-# Integración de Webhooks Beds24
+# 🏨 Integración Completa de Webhooks Beds24
 
-## Resumen
-Este documento describe la implementación completa de la integración con webhooks de Beds24, incluyendo configuración, procesamiento y sincronización de datos.
+## 📋 Resumen
+Documentación completa de la integración con webhooks de Beds24, incluyendo configuración, implementación técnica, procesamiento híbrido y troubleshooting.
 
-## Tabla de Contenidos
-- [Configuración en Beds24](#configuración-en-beds24)
-- [Arquitectura del Sistema](#arquitectura-del-sistema)
-- [Formato del Payload](#formato-del-payload)
-- [Procesamiento de Webhooks](#procesamiento-de-webhooks)
-- [Flujo de Sincronización](#flujo-de-sincronización)
-- [Monitoreo y Debugging](#monitoreo-y-debugging)
-- [Configuración Avanzada](#configuración-avanzada)
+## 📚 Tabla de Contenidos
+- [🔧 Configuración en Beds24](#configuración-en-beds24)
+- [🏗️ Arquitectura del Sistema](#arquitectura-del-sistema)
+- [📄 Formato del Payload](#formato-del-payload)
+- [⚙️ Implementación Técnica](#implementación-técnica)
+- [🔄 Flujo de Sincronización](#flujo-de-sincronización)
+- [📊 Monitoreo y Debugging](#monitoreo-y-debugging)
+- [🚨 Troubleshooting](#troubleshooting)
+- [✅ Estado de Implementación](#estado-de-implementación)
 
 ## Configuración en Beds24
 
@@ -155,7 +156,183 @@ const job = await addWebhookJob({
 });
 ```
 
-## Flujo de Sincronización
+## ⚙️ Implementación Técnica
+
+### Estructura de Archivos
+```
+data-sync/src/providers/beds24/
+├── client.ts          # Cliente API con rate limiting
+├── sync.ts            # Lógica de sincronización híbrida  
+├── utils.ts           # Funciones de extracción de datos
+└── types.ts           # Interfaces y tipos
+```
+
+### Cliente API (client.ts)
+```typescript
+export class Beds24Client {
+  private client: AxiosInstance;
+  private rateLimiter: RateLimiter;
+
+  async getBooking(bookingId: string): Promise<any> {
+    const response = await this.requestWithRetry({
+      method: 'GET',
+      url: `/bookings/${bookingId}`,
+      params: {
+        includeInvoice: true,
+        includeInfoItems: true,
+        includeComments: true,
+      }
+    });
+
+    return response.data.data?.[0] || null;
+  }
+}
+```
+
+### Webhook Handler (beds24.route.ts)
+```typescript
+router.post('/webhooks/beds24', verifyHmac, async (req, res) => {
+  const { booking, timeStamp } = req.body;
+  
+  if (!booking || !booking.id) {
+    return res.status(400).json({ 
+      error: 'Missing required fields: booking.id' 
+    });
+  }
+
+  // Respuesta inmediata
+  res.status(200).json({ 
+    status: 'accepted',
+    timestamp: new Date().toISOString()
+  });
+
+  // Determinar acción
+  let action = 'created';
+  if (booking.cancelTime) action = 'cancelled';
+  else if (booking.modifiedTime !== booking.bookingTime) action = 'modified';
+
+  // Encolar job asíncrono
+  await addWebhookJob({
+    bookingId: String(booking.id),
+    action,
+    timestamp: new Date(),
+    priority: action === 'cancelled' ? 'high' : 'normal'
+  });
+});
+```
+
+### Sincronización Híbrida (sync.ts)
+```typescript
+// Función principal - recibe solo bookingId
+export async function syncSingleBooking(bookingId: string) {
+  const client = getBeds24Client();
+  const bookingData = await client.getBooking(bookingId);
+  
+  if (!bookingData) {
+    return { success: false, action: 'skipped' };
+  }
+  
+  return await processSingleBookingData(bookingData);
+}
+
+// Procesamiento con extracción mejorada
+export async function processSingleBookingData(bookingData: any) {
+  const enhancedData = {
+    bookingId: (bookingData.bookingId || bookingData.id)?.toString(),
+    guestName: extractGuestName(bookingData),
+    phone: extractPhoneNumber(bookingData),
+    email: extractEmail(bookingData),
+    channel: determineChannel(bookingData),
+    internalNotes: combineNotes(bookingData),
+    messages: extractMessages(bookingData),
+    // ... más campos
+    raw: bookingData // Payload completo
+  };
+
+  await prisma.reservas.upsert({
+    where: { bookingId: enhancedData.bookingId },
+    create: enhancedData,
+    update: enhancedData
+  });
+}
+```
+
+### Funciones de Extracción (utils.ts)
+```typescript
+export function extractGuestName(bookingData: any): string | null {
+  // 1. Nombre completo
+  if (bookingData.guestFirstName && bookingData.guestName) {
+    return `${bookingData.guestFirstName} ${bookingData.guestName}`;
+  }
+  
+  // 2. firstName + lastName
+  if (bookingData.firstName && bookingData.lastName) {
+    return `${bookingData.firstName} ${bookingData.lastName}`;
+  }
+  
+  // 3. Solo guestName
+  if (bookingData.guestName) return bookingData.guestName;
+  
+  // 4. Fallback a reference
+  return bookingData.reference || null;
+}
+
+export function extractPhoneNumber(bookingData: any): string | null {
+  // 1. Campo directo
+  if (bookingData.phone) {
+    return cleanPhoneNumber(bookingData.phone);
+  }
+  
+  // 2. Extraer de apiReference (WhatsApp)
+  if (bookingData.apiReference) {
+    const phoneMatch = bookingData.apiReference.match(/(\+?\d{10,15})/);
+    if (phoneMatch) return cleanPhoneNumber(phoneMatch[1]);
+  }
+  
+  // 3. Regex desde comentarios
+  const text = `${bookingData.comments || ''} ${bookingData.notes || ''}`;
+  const phoneMatch = text.match(/(\+?\d{1,4}[\s-]?\d{10,15})/);
+  return phoneMatch ? cleanPhoneNumber(phoneMatch[1]) : null;
+}
+
+export function combineNotes(bookingData: any): string | null {
+  const notes = [];
+  
+  if (bookingData.notes) notes.push(bookingData.notes);
+  if (bookingData.comments) notes.push(bookingData.comments);
+  if (bookingData.channel) notes.push(`Source: ${bookingData.channel}`);
+  
+  return notes.length > 0 ? notes.join(' | ') : null;
+}
+```
+
+### Worker Processing (queue.manager.ts)
+```typescript
+export const beds24Worker = new Worker<JobData>(
+  'beds24-sync',
+  async (job: Job<JobData>) => {
+    if (data.type === 'webhook') {
+      const webhookData = data as WebhookJob;
+      
+      // Llamada híbrida - fetch data completa
+      await syncSingleBooking(webhookData.bookingId);
+      
+      logger.info({ 
+        jobId: job.id,
+        bookingId: webhookData.bookingId,
+        action: webhookData.action
+      }, 'Webhook job completed');
+    }
+  },
+  {
+    connection: redis,
+    concurrency: 2,
+    limiter: { max: 5, duration: 1000 }
+  }
+);
+```
+
+## 🔄 Flujo de Sincronización
 
 ### Estrategia Híbrida Implementada
 **Webhook como Trigger → API Call Completa → Extracción Mejorada**
@@ -416,6 +593,75 @@ curl https://dataservicebot-production.up.railway.app/api/admin/queues/stats
 1. Ve a Railway Dashboard → Data_Service_Bot → Logs
 2. Filtra por "beds24" o "webhook"
 3. Monitorea jobs procesados exitosamente
+
+## 🚨 Troubleshooting
+
+### Problemas Comunes
+
+#### Error 400: Bad Request
+**Síntoma**: `Missing required fields: booking.id`
+**Causa**: Payload de webhook incorrecto
+**Solución**: 
+```bash
+# Verificar configuración Beds24
+Version: 2 - with personal data
+URL: https://dataservicebot-production.up.railway.app/api/webhooks/beds24
+```
+
+#### Jobs en Failed State
+**Síntoma**: Queue stats muestran `failed > 0`
+**Diagnóstico**:
+```bash
+curl https://dataservicebot-production.up.railway.app/api/admin/queues/stats
+```
+**Soluciones**:
+- Verificar BEDS24_TOKEN en variables
+- Verificar conectividad a PostgreSQL
+- Retry failed jobs: `POST /api/admin/queues/retry-failed`
+
+#### Datos Incompletos en BD
+**Síntoma**: Campos null o información faltante del huésped
+**Causa**: API de Beds24 retorna datos parciales
+**Solución**: Las funciones de extracción tienen múltiples fallbacks implementados
+
+#### Performance Issues
+**Síntoma**: Jobs lentos (>5 segundos)
+**Optimizaciones**:
+- Reducir concurrencia: `concurrency: 1`
+- Ajustar rate limiting: `max: 3, duration: 1000`
+
+### Herramientas de Debug
+
+#### Test Webhook
+```bash
+curl -X POST https://dataservicebot-production.up.railway.app/api/webhooks/beds24 \
+  -H "Content-Type: application/json" \
+  -d '{
+    "timeStamp": "2025-08-14T21:29:52.926Z",
+    "booking": {
+      "id": 12345,
+      "status": "confirmed",
+      "bookingTime": "2025-08-14T21:29:52.926Z"
+    }
+  }'
+```
+
+#### Verificar Stats
+```bash
+# Estado general
+curl https://dataservicebot-production.up.railway.app/api/health
+
+# Queue stats
+curl https://dataservicebot-production.up.railway.app/api/admin/queues/stats
+```
+
+#### Logs Estructurados
+```bash
+# En Railway logs, buscar:
+"Beds24 webhook received"     # Webhook processing
+"Booking synced successfully" # Successful sync
+"Failed to sync"              # Errors
+```
 
 ---
 

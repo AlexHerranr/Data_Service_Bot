@@ -32,9 +32,8 @@ Bot Data Service es el **sistema nervioso de datos** del bot de WhatsApp, encarg
 ## 📚 **Documentación Detallada**
 
 ### Integraciones
-- 🏨 **[Beds24 Webhook Integration](docs/BEDS24_WEBHOOK_INTEGRATION.md)** - Guía completa de webhooks Beds24
-- 🔧 **[Beds24 Technical Spec](docs/BEDS24_WEBHOOK_TECHNICAL_SPEC.md)** - Especificación técnica detallada
-- 🚨 **[Beds24 Troubleshooting](docs/BEDS24_WEBHOOK_TROUBLESHOOTING.md)** - Guía de resolución de problemas
+- 🏨 **[Beds24 Webhook Integration](docs/BEDS24_WEBHOOK_INTEGRATION.md)** - **Documentación completa unificada**
+  - Configuración, implementación técnica, troubleshooting y monitoreo
 
 ### Sistema
 - 🏨 **[Guía Tabla Hoteles](docs/GUIA_TABLA_HOTELES.md)** - Mapeo de propiedades

@@ -2,24 +2,15 @@
 
 ## 🏨 Integración Beds24
 
-### 📋 Documentos Principales
-- **[BEDS24_WEBHOOK_INTEGRATION.md](BEDS24_WEBHOOK_INTEGRATION.md)** - Guía completa de integración
-  - Configuración en Beds24
-  - Arquitectura del sistema
-  - Flujo de sincronización
-  - Monitoreo y debugging
-
-- **[BEDS24_WEBHOOK_TECHNICAL_SPEC.md](BEDS24_WEBHOOK_TECHNICAL_SPEC.md)** - Especificación técnica
-  - Implementación detallada del código
-  - Tipos de datos y interfaces
-  - Configuración de colas
-  - Testing y deployment
-
-- **[BEDS24_WEBHOOK_TROUBLESHOOTING.md](BEDS24_WEBHOOK_TROUBLESHOOTING.md)** - Resolución de problemas
-  - Problemas comunes y soluciones
-  - Herramientas de debugging
-  - Monitoreo proactivo
-  - Procedimientos de escalación
+### 📋 Documento Principal
+- **[BEDS24_WEBHOOK_INTEGRATION.md](BEDS24_WEBHOOK_INTEGRATION.md)** - **Documentación completa unificada**
+  - 🔧 Configuración en Beds24
+  - 🏗️ Arquitectura del sistema
+  - ⚙️ Implementación técnica detallada
+  - 🔄 Flujo de sincronización híbrida
+  - 📊 Monitoreo y debugging
+  - 🚨 Troubleshooting completo
+  - ✅ Estado de implementación
 
 ### 🎯 Estado Actual
 - ✅ **Webhook configurado y operativo**
