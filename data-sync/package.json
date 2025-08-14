@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/main.ts",
-    "start": "npx tsx src/main.ts",
+    "start": "node --loader tsx/esm src/main.ts",
     "build": "npx tsc -p tsconfig.json",
     "db:generate": "prisma generate --schema ../prisma/schema.prisma",
     "db:migrate": "prisma migrate deploy --schema ../prisma/schema.prisma",
