@@ -8,7 +8,7 @@
     "dev": "tsx watch src/main.ts",
     "start": "node dist/main.js",
     "build": "npx prisma generate --schema ../prisma/schema.prisma && npx tsc -p tsconfig.json",
-    "postinstall": "npx prisma generate --schema ../prisma/schema.prisma",
+    "postinstall": "cd .. && npx prisma generate --schema prisma/schema.prisma && cd data-sync",
     "db:generate": "prisma generate --schema ../prisma/schema.prisma",
     "db:migrate": "prisma migrate deploy --schema ../prisma/schema.prisma",
     "db:studio": "prisma studio --schema ../prisma/schema.prisma",
