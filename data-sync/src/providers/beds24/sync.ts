@@ -8,7 +8,15 @@ import {
   determineBDStatus,
   shouldSyncAsLead,
   shouldSyncAsConfirmed,
-  isCancelledBooking
+  isCancelledBooking,
+  extractGuestName,
+  extractPhoneNumber,
+  extractEmail,
+  combineNotes,
+  calculateTotalPersons,
+  determineChannel,
+  extractMessages,
+  mapPropertyName
 } from './utils.js';
 import { prisma } from '../../infra/db/prisma.client.js';
 import { logger } from '../../utils/logger.js';
@@ -27,55 +35,91 @@ export interface LeadsAndConfirmedResult {
 }
 
 /**
- * Sync a single booking from Beds24 to database
+ * Sync a single booking by ID - fetches complete data from Beds24 API
  */
-export async function syncSingleBooking(bookingData: any): Promise<{
+export async function syncSingleBooking(bookingId: string): Promise<{
   success: boolean;
   action: 'created' | 'updated' | 'skipped';
   table: 'Booking' | 'Leads' | 'ReservationsCancelled';
 }> {
   try {
-    const bookingId = bookingData.bookingId?.toString();
-    if (!bookingId) {
-      logger.warn({ bookingData }, 'Booking missing bookingId');
+    logger.info({ bookingId }, 'Starting sync for booking');
+
+    // Fetch complete booking data from Beds24 API
+    const client = getBeds24Client();
+    const bookingData = await client.getBooking(bookingId);
+
+    if (!bookingData) {
+      logger.warn({ bookingId }, 'Booking not found in Beds24');
       return { success: false, action: 'skipped', table: 'Booking' };
     }
 
-    // Extract data from booking
+    logger.debug({ bookingId, bookingData }, 'Fetched complete booking data from API');
+
+    // Process the complete booking data
+    return await processSingleBookingData(bookingData);
+
+  } catch (error: any) {
+    logger.error({ error: error.message, bookingId }, 'Failed to sync single booking');
+    return { success: false, action: 'skipped', table: 'Booking' };
+  }
+}
+
+/**
+ * Process booking data (used by both sync methods)
+ */
+export async function processSingleBookingData(bookingData: any): Promise<{
+  success: boolean;
+  action: 'created' | 'updated' | 'skipped';
+  table: 'Booking' | 'Leads' | 'ReservationsCancelled';
+}> {
+  try {
+    // Extract booking ID from different possible fields
+    const bookingId = (bookingData.bookingId || bookingData.id)?.toString();
+    if (!bookingId) {
+      logger.warn({ bookingData }, 'Booking missing bookingId/id');
+      return { success: false, action: 'skipped', table: 'Booking' };
+    }
+
+    // Extract and transform data from complete Beds24 API response
     const { charges, payments, totalCharges, totalPayments, balance } = extractChargesAndPayments(bookingData);
     const infoItems = extractInfoItems(bookingData);
     const numNights = calculateNights(bookingData.arrival, bookingData.departure);
     const bdStatus = determineBDStatus(bookingData);
 
-    // Common booking data
+    // Enhanced guest information extraction
+    const guestName = extractGuestName(bookingData);
+    const phone = extractPhoneNumber(bookingData);
+    const email = extractEmail(bookingData);
+
+    // Enhanced booking data with more complete information
     const commonData = {
       bookingId,
-      phone: bookingData.phone || null,
-      guestName: bookingData.guestFirstName && bookingData.guestName 
-        ? `${bookingData.guestFirstName} ${bookingData.guestName}` 
-        : (bookingData.guestName || null),
+      phone,
+      guestName,
       status: bookingData.status || null,
-      internalNotes: bookingData.notes || null,
-      propertyName: bookingData.propertyName || null,
+      internalNotes: combineNotes(bookingData),
+      propertyName: mapPropertyName(bookingData.propertyId) || bookingData.propertyName || null,
       arrivalDate: formatDateSimple(bookingData.arrival),
       departureDate: formatDateSimple(bookingData.departure),
       numNights,
-      totalPersons: parseInt(bookingData.numAdult || '0') + parseInt(bookingData.numChild || '0') || null,
+      totalPersons: calculateTotalPersons(bookingData),
       totalCharges: totalCharges.toString(),
       totalPayments: totalPayments.toString(),
       balance: balance.toString(),
       basePrice: bookingData.price || null,
-      channel: bookingData.referer || null,
-      email: bookingData.guestEmail || null,
+      channel: determineChannel(bookingData),
+      email,
       apiReference: bookingData.apiReference || null,
       charges: charges,
       payments: payments,
+      messages: extractMessages(bookingData),
       infoItems,
       notes: bookingData.comments || null,
-      bookingDate: formatDateSimple(bookingData.created),
-      modifiedDate: formatDateSimple(bookingData.modified),
+      bookingDate: formatDateSimple(bookingData.created || bookingData.bookingTime),
+      modifiedDate: formatDateSimple(bookingData.modified || bookingData.modifiedTime),
       lastUpdatedBD: new Date(),
-      raw: bookingData,
+      raw: bookingData, // Always store complete API response
       BDStatus: bdStatus,
     };
 
@@ -212,7 +256,7 @@ export async function syncCancelledReservations(
     for (const booking of bookings) {
       result.processed++;
 
-      const syncResult = await syncSingleBooking(booking);
+      const syncResult = await processSingleBookingData(booking);
       
       if (syncResult.success) {
         if (syncResult.action !== 'skipped') {
@@ -264,7 +308,7 @@ export async function syncLeadsAndConfirmed(
     logger.info({ count: bookings.length }, 'Fetched confirmed bookings from Beds24');
 
     for (const booking of bookings) {
-      const syncResult = await syncSingleBooking(booking);
+      const syncResult = await processSingleBookingData(booking);
       
       if (syncResult.success && syncResult.action !== 'skipped') {
         if (shouldSyncAsLead(booking)) {
@@ -348,7 +392,7 @@ export async function processWebhook(webhookData: any): Promise<{
       // Multiple bookings in webhook
       for (const booking of webhookData.bookings) {
         try {
-          await syncSingleBooking(booking);
+          await processSingleBookingData(booking);
           processed++;
         } catch (error: any) {
           errors.push(`Booking ${booking.bookingId}: ${error.message}`);
@@ -357,7 +401,7 @@ export async function processWebhook(webhookData: any): Promise<{
     } else if (webhookData.bookingId) {
       // Single booking webhook
       try {
-        await syncSingleBooking(webhookData);
+        await processSingleBookingData(webhookData);
         processed++;
       } catch (error: any) {
         errors.push(`Booking ${webhookData.bookingId}: ${error.message}`);

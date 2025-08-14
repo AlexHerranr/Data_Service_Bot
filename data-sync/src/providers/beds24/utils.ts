@@ -249,3 +249,241 @@ export function isCancelledBooking(bookingData: any): boolean {
   const bdStatus = determineBDStatus(bookingData);
   return bdStatus === 'Cancelada';
 }
+
+/**
+ * Extract guest name with fallbacks for different API formats
+ */
+export function extractGuestName(bookingData: any): string | null {
+  // Try different name field combinations
+  if (bookingData.guestFirstName && bookingData.guestName) {
+    return `${bookingData.guestFirstName} ${bookingData.guestName}`;
+  }
+  
+  if (bookingData.guestName) {
+    return bookingData.guestName;
+  }
+  
+  if (bookingData.firstName && bookingData.lastName) {
+    return `${bookingData.firstName} ${bookingData.lastName}`;
+  }
+  
+  if (bookingData.firstName) {
+    return bookingData.firstName;
+  }
+  
+  // Fallback to reference or booking holder
+  if (bookingData.reference) {
+    return bookingData.reference;
+  }
+  
+  if (bookingData.invoiceeId) {
+    return `Guest ${bookingData.invoiceeId}`;
+  }
+  
+  return null;
+}
+
+/**
+ * Extract phone number with multiple fallback strategies
+ */
+export function extractPhoneNumber(bookingData: any): string | null {
+  // Direct phone field
+  if (bookingData.phone) {
+    return cleanPhoneNumber(bookingData.phone);
+  }
+  
+  // Phone from guest info
+  if (bookingData.guestPhone) {
+    return cleanPhoneNumber(bookingData.guestPhone);
+  }
+  
+  // Extract from API reference (common for WhatsApp integrations)
+  if (bookingData.apiReference) {
+    const phoneFromApi = extractPhoneFromApiReference(bookingData.apiReference);
+    if (phoneFromApi) {
+      return phoneFromApi;
+    }
+  }
+  
+  // Extract from comments or notes
+  const phoneFromNotes = extractPhoneFromText(
+    `${bookingData.comments || ''} ${bookingData.notes || ''}`
+  );
+  if (phoneFromNotes) {
+    return phoneFromNotes;
+  }
+  
+  return null;
+}
+
+/**
+ * Extract email address with fallbacks
+ */
+export function extractEmail(bookingData: any): string | null {
+  if (bookingData.email) {
+    return bookingData.email;
+  }
+  
+  if (bookingData.guestEmail) {
+    return bookingData.guestEmail;
+  }
+  
+  // Extract from comments or notes
+  const emailFromText = extractEmailFromText(
+    `${bookingData.comments || ''} ${bookingData.notes || ''}`
+  );
+  
+  return emailFromText;
+}
+
+/**
+ * Combine all notes and comments into internal notes
+ */
+export function combineNotes(bookingData: any): string | null {
+  const notes = [];
+  
+  if (bookingData.notes) {
+    notes.push(bookingData.notes);
+  }
+  
+  if (bookingData.comments) {
+    notes.push(bookingData.comments);
+  }
+  
+  if (bookingData.internalNotes) {
+    notes.push(bookingData.internalNotes);
+  }
+  
+  // Add channel info if available
+  if (bookingData.channel || bookingData.referer) {
+    notes.push(`Source: ${bookingData.channel || bookingData.referer}`);
+  }
+  
+  return notes.length > 0 ? notes.join(' | ') : null;
+}
+
+/**
+ * Calculate total persons with validation
+ */
+export function calculateTotalPersons(bookingData: any): number | null {
+  const adults = parseInt(bookingData.numAdult || bookingData.adults || '0') || 0;
+  const children = parseInt(bookingData.numChild || bookingData.children || '0') || 0;
+  const total = adults + children;
+  
+  return total > 0 ? total : null;
+}
+
+/**
+ * Determine channel with enhanced logic
+ */
+export function determineChannel(bookingData: any): string | null {
+  // Priority order for channel detection
+  if (bookingData.channel) {
+    return bookingData.channel;
+  }
+  
+  if (bookingData.referer) {
+    return bookingData.referer;
+  }
+  
+  if (bookingData.source) {
+    return bookingData.source;
+  }
+  
+  // Map API source to readable channel names
+  if (bookingData.apiSourceId || bookingData.apiSource) {
+    return mapApiSourceToChannel(bookingData.apiSourceId, bookingData.apiSource);
+  }
+  
+  return null;
+}
+
+/**
+ * Extract messages array from booking data
+ */
+export function extractMessages(bookingData: any): any[] {
+  if (bookingData.messages && Array.isArray(bookingData.messages)) {
+    return bookingData.messages.map(msg => ({
+      id: msg.id,
+      message: msg.message,
+      time: msg.time,
+      source: msg.source,
+      read: msg.read || false,
+    }));
+  }
+  
+  return [];
+}
+
+/**
+ * Map property ID to property name (implement based on your mapping)
+ */
+export function mapPropertyName(propertyId: number | string): string | null {
+  // TODO: Implement property mapping based on your configuration
+  // This could be a lookup table or API call
+  const propertyMap: Record<string, string> = {
+    '1': 'Property 1',
+    '2': 'Property 2',
+    // Add your property mappings here
+  };
+  
+  return propertyMap[String(propertyId)] || null;
+}
+
+// Helper functions
+
+/**
+ * Clean and validate phone number
+ */
+function cleanPhoneNumber(phone: string): string {
+  // Remove non-digit characters except +
+  const cleaned = phone.replace(/[^\d+]/g, '');
+  
+  // Ensure international format
+  if (!cleaned.startsWith('+')) {
+    return `+${cleaned}`;
+  }
+  
+  return cleaned;
+}
+
+/**
+ * Extract phone from API reference (common format: whatsapp_+1234567890)
+ */
+function extractPhoneFromApiReference(apiRef: string): string | null {
+  const phoneMatch = apiRef.match(/(\+?\d{10,15})/);
+  return phoneMatch ? cleanPhoneNumber(phoneMatch[1]) : null;
+}
+
+/**
+ * Extract phone number from text using regex
+ */
+function extractPhoneFromText(text: string): string | null {
+  const phonePattern = /(\+?\d{1,4}[\s-]?\d{10,15})/;
+  const match = text.match(phonePattern);
+  return match ? cleanPhoneNumber(match[1]) : null;
+}
+
+/**
+ * Extract email from text using regex
+ */
+function extractEmailFromText(text: string): string | null {
+  const emailPattern = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/;
+  const match = text.match(emailPattern);
+  return match ? match[0] : null;
+}
+
+/**
+ * Map API source ID to readable channel name
+ */
+function mapApiSourceToChannel(apiSourceId: number, apiSource: string): string {
+  const sourceMap: Record<number, string> = {
+    1: 'Booking.com',
+    2: 'Airbnb',
+    3: 'Expedia',
+    4: 'Direct',
+    // Add more mappings as needed
+  };
+  
+  return sourceMap[apiSourceId] || apiSource || 'Unknown';
+}
