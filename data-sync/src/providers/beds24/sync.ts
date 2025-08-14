@@ -130,11 +130,11 @@ export async function processSingleBookingData(bookingData: any): Promise<{
       return await syncActiveBooking(commonData);
     } else {
       // Regular booking - sync to main Booking table
-      const existing = await prisma.reservas.findUnique({
+      const existing = await prisma.booking.findUnique({
         where: { bookingId }
       });
 
-      const result = await prisma.reservas.upsert({
+      const result = await prisma.booking.upsert({
         where: { bookingId },
         create: commonData,
         update: {
@@ -162,11 +162,11 @@ async function syncCancelledBooking(bookingData: any): Promise<{
   table: 'ReservationsCancelled';
 }> {
   try {
-    const existing = await prisma.reservas.findUnique({
+    const existing = await prisma.booking.findUnique({
       where: { bookingId: bookingData.bookingId }
     });
 
-    await prisma.reservas.upsert({
+    await prisma.booking.upsert({
       where: { bookingId: bookingData.bookingId },
       create: {
         ...bookingData,
@@ -198,11 +198,11 @@ async function syncActiveBooking(bookingData: any): Promise<{
 }> {
   try {
     // Always sync to main Booking table first
-    const existingBooking = await prisma.reservas.findUnique({
+    const existingBooking = await prisma.booking.findUnique({
       where: { bookingId: bookingData.bookingId }
     });
 
-    await prisma.reservas.upsert({
+    await prisma.booking.upsert({
       where: { bookingId: bookingData.bookingId },
       create: bookingData,
       update: {

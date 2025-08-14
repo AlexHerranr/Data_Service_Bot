@@ -10,7 +10,8 @@
       "Bash(npm run dev:*)",
       "Bash(npx tsx:*)",
       "Bash(npx tsc:*)",
-      "Bash(npm run test-build:*)"
+      "Bash(npm run test-build:*)",
+      "Bash(npx prisma generate:*)"
     ],
     "defaultMode": "acceptEdits"
   }

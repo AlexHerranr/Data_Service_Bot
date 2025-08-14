@@ -5,14 +5,6 @@ import { prisma } from '../../infra/db/prisma.client.js';
 const VALID_TABLES = ['ClientView', 'Booking', 'Leads', 'hotel_apartments'] as const;
 type ValidTable = typeof VALID_TABLES[number];
 
-// Mapeo de nombres de tabla BD → nombres de modelo Prisma
-const TABLE_TO_MODEL: Record<ValidTable, string> = {
-  'ClientView': 'whatsApp',
-  'Booking': 'reservas', 
-  'Leads': 'prospectos',
-  'hotel_apartments': 'apartamentos'
-};
-
 function isValidTable(table: string): table is ValidTable {
   return VALID_TABLES.includes(table as ValidTable);
 }
@@ -38,8 +30,7 @@ export function registerTablesRoute(router: Router): void {
       
       logger.debug({ tableName, filters, limit: limitNum, offset: offsetNum }, 'Fetching table data');
       
-      const modelName = TABLE_TO_MODEL[tableName];
-      const model = (prisma as any)[modelName];
+      const model = (prisma as any)[tableName];
       const where = Object.keys(filters).length > 0 ? filters : undefined;
       
       // Configurar ordenación según la tabla
@@ -89,8 +80,7 @@ export function registerTablesRoute(router: Router): void {
       
       logger.debug({ tableName, id }, 'Fetching record by ID');
       
-      const modelName = TABLE_TO_MODEL[tableName];
-      const model = (prisma as any)[modelName];
+      const model = (prisma as any)[tableName];
       
       // Construir where clause según la tabla
       let whereClause: any;
@@ -138,8 +128,7 @@ export function registerTablesRoute(router: Router): void {
       
       logger.debug({ tableName, data }, 'Creating new record');
       
-      const modelName = TABLE_TO_MODEL[tableName];
-      const model = (prisma as any)[modelName];
+      const model = (prisma as any)[tableName];
       const created = await model.create({ data });
       
       res.status(201).json(created);
@@ -177,8 +166,7 @@ export function registerTablesRoute(router: Router): void {
       
       logger.debug({ tableName, id, data }, 'Updating record');
       
-      const modelName = TABLE_TO_MODEL[tableName];
-      const model = (prisma as any)[modelName];
+      const model = (prisma as any)[tableName];
       
       // Construir where clause según la tabla
       let whereClause: any;
@@ -232,8 +220,7 @@ export function registerTablesRoute(router: Router): void {
       
       logger.warn({ tableName, id, action: 'DELETE_ATTEMPT' }, '⚠️ DELETE record attempt');
       
-      const modelName = TABLE_TO_MODEL[tableName];
-      const model = (prisma as any)[modelName];
+      const model = (prisma as any)[tableName];
       
       // Construir where clause según la tabla
       let whereClause: any;

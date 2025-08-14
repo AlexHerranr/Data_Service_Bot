@@ -9,7 +9,7 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model WhatsApp {
+model ClientView {
   phoneNumber        String    @id
   name               String?
   userName           String?
@@ -22,22 +22,18 @@ model WhatsApp {
   proximaAccion      String?
   fechaProximaAccion DateTime?
   prioridad          Int?
-
-  @@map("ClientView")
 }
 
-model Apartamentos {
+model hotel_apartments {
   id          Int    @id @default(autoincrement())
   propertyId  Int    @map("property_id")
   roomId      Int    @unique @map("room_id")
   roomName    String @map("room_name")
   extraCharge Json   @default("{\"amount\": 70000, \"description\": \"Cargo adicional:\"}") @map("extra_charge")
   capacity    Int    @default(4)
-
-  @@map("hotel_apartments")
 }
 
-model Reservas {
+model Booking {
   id            Int      @id @default(autoincrement())
   bookingId     String   @unique
   phone         String?
@@ -66,7 +62,7 @@ model Reservas {
   lastUpdatedBD DateTime @default(now())
   raw           Json?
   BDStatus      String?
-  Prospectos         Prospectos?
+  Leads         Leads?
 
   @@index([arrivalDate])
   @@index([bookingId])
@@ -79,11 +75,9 @@ model Reservas {
   @@index([status])
   @@index([BDStatus])
   @@index([BDStatus], map: "idx_Booking_BDStatus")
-
-  @@map("Booking")
 }
 
-model Prospectos {
+model Leads {
   id            Int      @id @default(autoincrement())
   bookingId     String?  @unique
   phone         String
@@ -100,7 +94,7 @@ model Prospectos {
   lastUpdatedLeads DateTime @default(now())
   numNights     Int?
   leadNotes     String?
-  Reservas       Reservas? @relation(fields: [bookingId], references: [bookingId], onDelete: Cascade, onUpdate: NoAction, map: "Leads_booking_fk")
+  Booking       Booking? @relation(fields: [bookingId], references: [bookingId], onDelete: Cascade, onUpdate: NoAction, map: "Leads_booking_fk")
 
   @@index([arrivalDate])
   @@index([phone])
@@ -108,6 +102,4 @@ model Prospectos {
   @@index([source])
   @@index([arrivalDate], map: "idx_Leads_arrivalDate")
   @@index([phone], map: "idx_Leads_phone")
-
-  @@map("Leads")
 }
