@@ -1,5 +1,5 @@
 import { createBullBoard } from '@bull-board/api';
-import { BullMQAdapter } from '@bull-board/api/bullMQAdapter';
+import { BullMQAdapter } from '@bull-board/api/bullMQAdapter.js';
 import { ExpressAdapter } from '@bull-board/express';
 import { beds24Queue, deadLetterQueue, getQueueStats, retryFailedJobs, cleanOldJobs, getJobById } from '../../../infra/queues/queue.manager.js';
 import { logger } from '../../../utils/logger.js';
