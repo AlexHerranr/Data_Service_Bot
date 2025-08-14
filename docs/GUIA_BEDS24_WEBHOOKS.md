@@ -1,4 +1,18 @@
-# 🏨 Integración Completa de Webhooks Beds24
+# 🏨 GUÍA COMPLETA: Beds24 Webhooks
+
+## 📋 ¿Qué Son los Webhooks de Beds24?
+
+Los webhooks de Beds24 son **notificaciones automáticas** que se envían desde Beds24 hacia nuestro servidor cada vez que ocurre un evento importante en una reserva (creación, modificación, cancelación).
+
+### 🎯 **Propósito**
+- **Sincronización en tiempo real**: No necesitamos consultar constantemente la API
+- **Automatización**: Nuestro bot se actualiza automáticamente cuando cambia algo
+- **Eficiencia**: Solo procesamos los cambios que realmente ocurren
+
+### 🔄 **Flujo Básico**
+```
+Beds24 detecta cambio → Envía webhook → Nuestro servidor procesa → BD actualizada → Bot tiene datos frescos
+```
 
 ## 📋 Resumen
 Documentación completa de la integración con webhooks de Beds24, incluyendo configuración, implementación técnica, procesamiento híbrido y troubleshooting.
@@ -54,42 +68,171 @@ Beds24 → Webhook Endpoint → Queue Job → API Sync → Database Update
    - Extrae datos relevantes
    - Actualiza base de datos
 
-## Formato del Payload
+## 📦 ¿Qué Envía Beds24 Exactamente?
 
-### Estructura del Webhook Beds24
+### 🎯 **Eventos que Triggean Webhooks**
+
+Beds24 envía webhooks cuando ocurre cualquiera de estos eventos:
+
+1. **Nueva Reserva** (`created`)
+   - Alguien hace una reserva nueva en cualquier canal
+   - Llega desde Booking.com, Airbnb, directo, etc.
+
+2. **Modificación** (`modified`) 
+   - Cambio de fechas, número de huéspedes
+   - Actualización de información de contacto
+   - Cambio de status de la reserva
+
+3. **Cancelación** (`cancelled`)
+   - Reserva cancelada por el huésped
+   - Cancelación por el hotel
+   - No-show marcado
+
+### 📋 **Estructura Completa del Payload**
+
+Beds24 envía un objeto JSON con esta estructura:
+
 ```json
 {
   "timeStamp": "2025-08-14T21:29:52.926Z",
+  "retries": 0,
   "booking": {
-    "id": 12345,
-    "bookingGroup": {
+    // === IDENTIFICACIÓN ===
+    "id": 12345,                    // ID único de la reserva
+    "masterId": 0,                  // ID del booking principal (grupos)
+    "bookingGroup": {               // Información de grupos
       "master": 0,
-      "ids": [12345]
+      "ids": [12345, 12346]
     },
-    "masterId": 0,
-    "propertyId": 101,
-    "roomId": 201,
-    "status": "confirmed",
-    "subStatus": "active",
-    "arrival": "2025-08-15",
-    "departure": "2025-08-17",
-    "numAdult": 2,
-    "numChild": 0,
-    "price": 250.00,
-    "deposit": 50.00,
-    "tax": 25.00,
-    "bookingTime": "2025-08-14T21:29:52.926Z",
-    "modifiedTime": "2025-08-14T21:29:52.926Z",
-    "cancelTime": null,
-    "channel": "booking.com",
-    "reference": "BK123456",
-    "apiReference": "API789"
+    "reference": "BK123456",        // Referencia del canal
+    "apiReference": "whatsapp_+573001234567", // Ref de API (importante!)
+    
+    // === FECHAS Y TIEMPOS ===
+    "arrival": "2025-08-15",        // Fecha llegada (YYYY-MM-DD)
+    "departure": "2025-08-17",      // Fecha salida
+    "bookingTime": "2025-08-14T21:29:52.926Z",   // Cuándo se hizo
+    "modifiedTime": "2025-08-14T21:29:52.926Z",  // Última modificación
+    "cancelTime": null,             // Si está cancelada
+    
+    // === PROPIEDAD ===
+    "propertyId": 101,              // ID de la propiedad
+    "roomId": 201,                  // ID de la habitación/apartamento
+    
+    // === HUÉSPEDES ===
+    "numAdult": 2,                  // Adultos
+    "numChild": 0,                  // Niños
+    "guestFirstName": "Juan",       // Nombre (si disponible)
+    "guestName": "Pérez",           // Apellido
+    "phone": "+573001234567",       // Teléfono (no siempre)
+    "email": "juan@email.com",      // Email (no siempre)
+    
+    // === FINANCIERO ===
+    "price": 250.00,                // Precio base
+    "deposit": 50.00,               // Depósito
+    "tax": 25.00,                   // Impuestos
+    "status": "confirmed",          // Estado: confirmed, cancelled, etc.
+    "subStatus": "active",          // Sub-estado
+    
+    // === CANAL Y ORIGEN ===
+    "channel": "booking.com",       // De dónde viene
+    "referer": "booking.com",       // Canal específico
+    "source": "api",                // Método de creación
+    
+    // === NOTAS Y COMENTARIOS ===
+    "notes": "Guest requested late check-in", // Notas internas
+    "comments": "Llegará tarde",    // Comentarios del huésped
+    "internalNotes": "VIP guest"    // Notas privadas del hotel
   },
-  "invoiceItems": [],
-  "infoItems": [],
-  "messages": [],
-  "retries": 0
+  
+  // === DATOS ADICIONALES ===
+  "invoiceItems": [               // Cargos adicionales
+    {
+      "description": "City tax",
+      "amount": 10.00,
+      "quantity": 2
+    }
+  ],
+  
+  "infoItems": [                  // Información extra
+    {
+      "type": "arrival_time", 
+      "value": "15:00"
+    }
+  ],
+  
+  "messages": [                   // Mensajes del sistema
+    {
+      "time": "2025-08-14T21:29:52.926Z",
+      "type": "booking_confirmation",
+      "text": "Booking confirmed automatically"
+    }
+  ]
 }
+```
+
+### 🔍 **Campos Más Importantes Para Nuestro Bot**
+
+#### **Identificación Crítica**
+- `booking.id` - **OBLIGATORIO**: ID único de Beds24
+- `booking.apiReference` - **MUY IMPORTANTE**: Contiene teléfono de WhatsApp como `whatsapp_+573001234567`
+
+#### **Información del Huésped**
+- `booking.guestFirstName` + `booking.guestName` = Nombre completo
+- `booking.phone` - Teléfono directo (no siempre presente)
+- `booking.email` - Email (no siempre presente)
+
+#### **Fechas Clave**
+- `booking.arrival` / `booking.departure` - Fechas de estadía
+- `booking.bookingTime` - Cuándo se hizo la reserva
+- `booking.modifiedTime` - Última modificación
+- `booking.cancelTime` - Si está cancelada
+
+#### **Canal y Origen**
+- `booking.channel` - De dónde viene: "booking.com", "airbnb", "direct", etc.
+- `booking.reference` - Código de referencia del canal
+
+#### **Estado**
+- `booking.status` - "confirmed", "cancelled", "tentative", etc.
+- `booking.subStatus` - Estado más específico
+
+### 💡 **Casos Especiales Que Maneja Nuestro Sistema**
+
+#### **Reservas de WhatsApp**
+```json
+{
+  "booking": {
+    "apiReference": "whatsapp_+573001234567",  // ← Teléfono extraído aquí
+    "channel": "direct",
+    "phone": null,                             // ← A veces viene vacío
+    "guestName": "Juan Pérez"                  // ← Nombre del contacto
+  }
+}
+```
+
+#### **Reservas de Booking.com**
+```json
+{
+  "booking": {
+    "channel": "booking.com",
+    "reference": "BK123456789",
+    "guestFirstName": "Juan",
+    "guestName": "Pérez",
+    "phone": "+573001234567",                  // ← Teléfono directo
+    "email": "juan@email.com"
+  }
+}
+```
+
+#### **Reservas Canceladas**
+```json
+{
+  "booking": {
+    "status": "cancelled",
+    "cancelTime": "2025-08-14T22:00:00.000Z", // ← Cuándo se canceló
+    "subStatus": "guest_cancelled"
+  }
+}
+```
 ```
 
 ### Mapeo de Datos Mejorado

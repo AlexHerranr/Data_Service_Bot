@@ -29,15 +29,58 @@ Bot Data Service es el **sistema nervioso de datos** del bot de WhatsApp, encarg
                                    └─────────────────┘
 ```
 
+## 🗄️ **Base de Datos Compartida**
+
+### **Estrategia: BD Unificada**
+**MISMA BD COMPARTIDA**:
+- Ambos proyectos usan `DATABASE_URL` idéntica
+- Schemas Prisma idénticos (ClientView, Booking, Leads, hotel_apartments)
+- Bot accede directamente vía database.service.ts
+
+### 📊 **División de Responsabilidades**
+
+#### 🤖 **Bot WhatsApp (Cliente)**
+- ✅ **ClientView** - Solo lectura/escritura básica
+- ✅ **Conversaciones** - Thread management
+- ✅ **WhatsApp API** - Mensajes, indicadores
+- ❌ **NO debe tocar Beds24/Reservas directamente**
+
+#### 🏨 **Bot Data Service (Backend)**
+- ✅ **CRUD completo** - Todas las tablas
+- ✅ **Beds24 API** - Sincronización reservas
+- ✅ **Webhooks** - Procesamiento async
+- ✅ **Whapi Admin** - Gestión avanzada
+
+#### 🎯 **Comunicación**
+```
+Bot WhatsApp → BD ← Bot Data Service
+     ↓              ↑
+ClientView     Reservas/Beds24
+```
+
+### 🗂️ **Tablas Gestionadas**
+
+| Tabla | Bot WhatsApp | Data Service | Descripción |
+|-------|--------------|--------------|-------------|
+| **ClientView** | ✅ R/W | ✅ CRUD | Clientes WhatsApp |
+| **Booking** | ❌ Solo lectura | ✅ CRUD | Reservas Beds24 |
+| **Leads** | ❌ Solo lectura | ✅ CRUD | Prospectos |
+| **hotel_apartments** | ❌ Solo lectura | ✅ CRUD | Propiedades |
+
+**RESULTADO**: Bot mantiene función actual (chat + BD básica), Data Service maneja lógica de negocio
+
 ## 📚 **Documentación Detallada**
 
 ### Integraciones
-- 🏨 **[Beds24 Webhook Integration](docs/BEDS24_WEBHOOK_INTEGRATION.md)** - **Documentación completa unificada**
-  - Configuración, implementación técnica, troubleshooting y monitoreo
+- 🏨 **[Guía Beds24 Webhooks](docs/GUIA_BEDS24_WEBHOOKS.md)** - **Documentación completa**
+  - Qué envía Beds24, configuración, implementación técnica, troubleshooting
+- 📋 **[Checklist Funcionalidades](docs/BOT_DATA_SERVICE_FUNCIONALIDADES.md)** - Lista completa
+- 📚 **[Índice Documentación](docs/INDICE_DOCUMENTACION.md)** - Todas las guías
 
 ### Sistema
 - 🏨 **[Guía Tabla Hoteles](docs/GUIA_TABLA_HOTELES.md)** - Mapeo de propiedades
 - 📊 **[BD Status Automático](docs/RESUMEN_BDSTATUS_AUTOMATICO.md)** - Sistema de estados
+- 🗄️ **[Estrategia BD Compartida](ESTRATEGIA_BD_COMPARTIDA.md)** - Arquitectura DB
 
 ### **Componentes**
 - **`data-sync/`** - Servicio principal BullMQ + Prometheus + OpenAPI

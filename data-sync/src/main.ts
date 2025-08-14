@@ -83,7 +83,7 @@ async function main() {
   app.get('/', (req, res) => {
     res.json({
       service: 'data-sync',
-      version: '1.0.0',
+      version: '1.0.1',
       endpoints: {
         health: '/api/health',
         webhooks: {
