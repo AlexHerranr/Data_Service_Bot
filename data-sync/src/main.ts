@@ -7,6 +7,7 @@ import { registerHealthRoute } from './server/routes/health.route.js';
 import { registerBeds24Webhook } from './server/routes/webhooks/beds24.route.js';
 import { registerWhapiWebhook } from './server/routes/webhooks/whapi.route.js';
 import { registerQueuesRoute } from './server/routes/admin/queues.route.js';
+import { registerTablesRoute } from './server/routes/tables.route.js';
 import { register } from './infra/metrics/prometheus.js';
 import { swaggerSpec } from './docs/openapi.js';
 import { env } from './config/env.js';
@@ -40,6 +41,7 @@ async function main() {
   registerBeds24Webhook(router);
   registerWhapiWebhook(router);
   registerQueuesRoute(router);
+  registerTablesRoute(router);
   
   app.use('/api', router);
   
@@ -88,6 +90,7 @@ async function main() {
           beds24: '/api/webhooks/beds24',
           whapi: '/api/webhooks/whapi'
         },
+        tables: '/api/tables/:tableName',
         dashboard: '/api/admin/queues/ui',
         stats: '/api/admin/queues/stats',
         metrics: env.PROMETHEUS_ENABLED ? '/metrics' : null,
