@@ -27,7 +27,7 @@ export function registerBeds24Webhook(router: Router): void {
       const bookingId = String(booking.id);
       const status = booking.status || 'unknown';
       // Determinar acción basada en el estado y timestamps
-      let action = 'created';
+      let action: 'created' | 'modified' | 'cancelled' = 'created';
       if (booking.cancelTime) {
         action = 'cancelled';
       } else if (booking.modifiedTime && booking.bookingTime !== booking.modifiedTime) {

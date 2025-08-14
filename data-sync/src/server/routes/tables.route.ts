@@ -12,7 +12,7 @@ function isValidTable(table: string): table is ValidTable {
 export function registerTablesRoute(router: Router): void {
   
   // GET /api/tables/:tableName - Lista registros con filtros
-  router.get('/tables/:tableName', async (req: Request, res: Response) => {
+  router.get('/tables/:tableName', async (req: Request, res: Response): Promise<void> => {
     try {
       const { tableName } = req.params;
       const { limit = '50', offset = '0', ...filters } = req.query;
@@ -62,7 +62,7 @@ export function registerTablesRoute(router: Router): void {
   });
 
   // GET /api/tables/:tableName/:id - Obtener registro por ID
-  router.get('/tables/:tableName/:id', async (req: Request, res: Response) => {
+  router.get('/tables/:tableName/:id', async (req: Request, res: Response): Promise<void> => {
     try {
       const { tableName, id } = req.params;
       
@@ -93,7 +93,7 @@ export function registerTablesRoute(router: Router): void {
   });
 
   // POST /api/tables/:tableName - Crear nuevo registro
-  router.post('/tables/:tableName', async (req: Request, res: Response) => {
+  router.post('/tables/:tableName', async (req: Request, res: Response): Promise<void> => {
     try {
       const { tableName } = req.params;
       const data = req.body;
@@ -128,7 +128,7 @@ export function registerTablesRoute(router: Router): void {
   });
 
   // PATCH /api/tables/:tableName/:id - Actualizar registro
-  router.patch('/tables/:tableName/:id', async (req: Request, res: Response) => {
+  router.patch('/tables/:tableName/:id', async (req: Request, res: Response): Promise<void> => {
     try {
       const { tableName, id } = req.params;
       const data = req.body;
@@ -166,7 +166,7 @@ export function registerTablesRoute(router: Router): void {
   });
 
   // DELETE /api/tables/:tableName/:id - Eliminar registro (CON PROTECCIÓN)
-  router.delete('/tables/:tableName/:id', async (req: Request, res: Response) => {
+  router.delete('/tables/:tableName/:id', async (req: Request, res: Response): Promise<void> => {
     try {
       const { tableName, id } = req.params;
       

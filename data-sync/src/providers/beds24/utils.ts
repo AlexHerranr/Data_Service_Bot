@@ -403,7 +403,7 @@ export function determineChannel(bookingData: any): string | null {
  */
 export function extractMessages(bookingData: any): any[] {
   if (bookingData.messages && Array.isArray(bookingData.messages)) {
-    return bookingData.messages.map(msg => ({
+    return bookingData.messages.map((msg: any) => ({
       id: msg.id,
       message: msg.message,
       time: msg.time,
