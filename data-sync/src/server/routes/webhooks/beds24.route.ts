@@ -12,16 +12,24 @@ function verifyHmac(req: Request, res: Response, next: Function) {
 export function registerBeds24Webhook(router: Router): void {
   router.post('/webhooks/beds24', verifyHmac, async (req: Request, res: Response): Promise<void> => {
     try {
-      const { bookingId, action, status } = req.body;
+      const { booking, timeStamp } = req.body;
       
-      // Validar datos del webhook
-      if (!bookingId || !action) {
+      // Validar estructura del webhook de Beds24
+      if (!booking || !booking.id) {
         res.status(400).json({ 
-          error: 'Missing required fields: bookingId, action',
+          error: 'Missing required fields: booking.id',
           received: false
         });
         return;
       }
+
+      // Extraer datos del formato de Beds24
+      const bookingId = String(booking.id);
+      const status = booking.status || 'unknown';
+      // Determinar acción basada en el estado y timestamps
+      const action = booking.modifiedTime && booking.bookingTime !== booking.modifiedTime 
+        ? 'modified' 
+        : 'created';
 
       // Respuesta inmediata para Beds24
       res.status(200).json({ 
@@ -34,8 +42,11 @@ export function registerBeds24Webhook(router: Router): void {
         type: 'beds24:webhook', 
         bookingId, 
         action, 
-        status 
-      }, 'Webhook received');
+        status,
+        propertyId: booking.propertyId,
+        arrival: booking.arrival,
+        departure: booking.departure
+      }, 'Beds24 webhook received');
 
       // Record webhook metrics
       metricsHelpers.recordWebhook('beds24', action);
