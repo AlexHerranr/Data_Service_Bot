@@ -1,8 +1,8 @@
 import { createBullBoard } from '@bull-board/api';
 import { BullMQAdapter } from '@bull-board/api/bullMQAdapter';
 import { ExpressAdapter } from '@bull-board/express';
-import { beds24Queue, deadLetterQueue, getQueueStats, retryFailedJobs, cleanOldJobs, getJobById } from '../../../infra/queues/queue.manager';
-import { logger } from '../../../utils/logger';
+import { beds24Queue, deadLetterQueue, getQueueStats, retryFailedJobs, cleanOldJobs, getJobById } from '../../../infra/queues/queue.manager.js';
+import { logger } from '../../../utils/logger.js';
 const serverAdapter = new ExpressAdapter();
 serverAdapter.setBasePath('/admin/queues/ui');
 createBullBoard({

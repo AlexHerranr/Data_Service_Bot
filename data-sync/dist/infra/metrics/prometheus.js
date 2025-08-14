@@ -1,6 +1,6 @@
 import { register, collectDefaultMetrics, Counter, Histogram, Gauge } from 'prom-client';
-import { env } from '../../config/env';
-import { logger } from '../../utils/logger';
+import { env } from '../../config/env.js';
+import { logger } from '../../utils/logger.js';
 if (env.PROMETHEUS_ENABLED) {
     collectDefaultMetrics({
         register,

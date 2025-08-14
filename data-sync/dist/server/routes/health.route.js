@@ -1,8 +1,8 @@
-import { logger } from '../../utils/logger';
-import { redis } from '../../infra/redis/redis.client';
-import { prisma } from '../../infra/db/prisma.client';
-import { getQueueStats } from '../../infra/queues/queue.manager';
-import { metricsHelpers } from '../../infra/metrics/prometheus';
+import { logger } from '../../utils/logger.js';
+import { redis } from '../../infra/redis/redis.client.js';
+import { prisma } from '../../infra/db/prisma.client.js';
+import { getQueueStats } from '../../infra/queues/queue.manager.js';
+import { metricsHelpers } from '../../infra/metrics/prometheus.js';
 export function registerHealthRoute(router) {
     router.get('/health', async (req, res) => {
         const startTime = Date.now();

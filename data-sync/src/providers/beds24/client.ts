@@ -1,6 +1,6 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
-import { env } from '../../config/env';
-import { logger } from '../../utils/logger';
+import { env } from '../../config/env.js';
+import { logger } from '../../utils/logger.js';
 
 export interface Beds24ApiResponse<T = any> {
   success: boolean;

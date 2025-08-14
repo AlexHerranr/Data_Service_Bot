@@ -1,6 +1,6 @@
-import { logger } from '../../../utils/logger';
-import { addWebhookJob } from '../../../infra/queues/queue.manager';
-import { metricsHelpers } from '../../../infra/metrics/prometheus';
+import { logger } from '../../../utils/logger.js';
+import { addWebhookJob } from '../../../infra/queues/queue.manager.js';
+import { metricsHelpers } from '../../../infra/metrics/prometheus.js';
 function verifyHmac(req, res, next) {
     next();
 }

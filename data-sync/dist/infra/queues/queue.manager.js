@@ -1,8 +1,8 @@
 import { Queue, Worker } from 'bullmq';
-import { redis } from '../redis/redis.client';
-import { logger } from '../../utils/logger';
-import { syncSingleBooking, syncCancelledReservations, syncLeadsAndConfirmed } from '../../providers/beds24/sync';
-import { metricsHelpers } from '../metrics/prometheus';
+import { redis } from '../redis/redis.client.js';
+import { logger } from '../../utils/logger.js';
+import { syncSingleBooking, syncCancelledReservations, syncLeadsAndConfirmed } from '../../providers/beds24/sync.js';
+import { metricsHelpers } from '../metrics/prometheus.js';
 const QUEUE_CONFIG = {
     connection: redis,
     defaultJobOptions: {

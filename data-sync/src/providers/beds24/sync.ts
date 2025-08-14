@@ -1,4 +1,4 @@
-import { getBeds24Client } from './client';
+import { getBeds24Client } from './client.js';
 import { 
   parseDate, 
   formatDateSimple, 
@@ -9,7 +9,7 @@ import {
   shouldSyncAsLead,
   shouldSyncAsConfirmed,
   isCancelledBooking
-} from './utils';
+} from './utils.js';
 import { prisma } from '../../infra/db/prisma.client.js';
 import { logger } from '../../utils/logger.js';
 

@@ -1,6 +1,6 @@
 import axios from 'axios';
-import { env } from '../../config/env';
-import { logger } from '../../utils/logger';
+import { env } from '../../config/env.js';
+import { logger } from '../../utils/logger.js';
 export class Beds24Error extends Error {
     code;
     details;

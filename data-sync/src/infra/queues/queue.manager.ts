@@ -1,6 +1,6 @@
 import { Queue, Worker, Job } from 'bullmq';
-import { redis } from '../redis/redis.client';
-import { logger } from '../../utils/logger';
+import { redis } from '../redis/redis.client.js';
+import { logger } from '../../utils/logger.js';
 import { 
   JobData, 
   WebhookJob, 
@@ -9,13 +9,13 @@ import {
   WhapiJob,
   QueueStats,
   QueueJobOptions
-} from '../../types/jobs.types';
+} from '../../types/jobs.types.js';
 import { 
   syncSingleBooking, 
   syncCancelledReservations, 
   syncLeadsAndConfirmed 
-} from '../../providers/beds24/sync';
-import { metricsHelpers } from '../metrics/prometheus';
+} from '../../providers/beds24/sync.js';
+import { metricsHelpers } from '../metrics/prometheus.js';
 
 // Configuración de colas
 const QUEUE_CONFIG = {

@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
-import { logger } from '../../../utils/logger';
-import { addWebhookJob } from '../../../infra/queues/queue.manager';
-import { metricsHelpers } from '../../../infra/metrics/prometheus';
+import { logger } from '../../../utils/logger.js';
+import { addWebhookJob } from '../../../infra/queues/queue.manager.js';
+import { metricsHelpers } from '../../../infra/metrics/prometheus.js';
 
 // TODO: Implement HMAC verification
 function verifyHmac(req: Request, res: Response, next: Function) {

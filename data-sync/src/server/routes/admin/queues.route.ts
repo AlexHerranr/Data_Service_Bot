@@ -9,8 +9,8 @@ import {
   retryFailedJobs,
   cleanOldJobs,
   getJobById
-} from '../../../infra/queues/queue.manager';
-import { logger } from '../../../utils/logger';
+} from '../../../infra/queues/queue.manager.js';
+import { logger } from '../../../utils/logger.js';
 
 // Bull Board UI Setup
 const serverAdapter = new ExpressAdapter();

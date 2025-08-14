@@ -1,7 +1,7 @@
-import { getBeds24Client } from './client';
-import { formatDateSimple, extractChargesAndPayments, extractInfoItems, calculateNights, determineBDStatus, shouldSyncAsLead, shouldSyncAsConfirmed, isCancelledBooking } from './utils';
-import { prisma } from '../../infra/db/prisma.client';
-import { logger } from '../../utils/logger';
+import { getBeds24Client } from './client.js';
+import { formatDateSimple, extractChargesAndPayments, extractInfoItems, calculateNights, determineBDStatus, shouldSyncAsLead, shouldSyncAsConfirmed, isCancelledBooking } from './utils.js';
+import { prisma } from '../../infra/db/prisma.client.js';
+import { logger } from '../../utils/logger.js';
 export async function syncSingleBooking(bookingData) {
     try {
         const bookingId = bookingData.bookingId?.toString();

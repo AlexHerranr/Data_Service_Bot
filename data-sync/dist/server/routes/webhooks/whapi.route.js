@@ -1,6 +1,6 @@
-import { logger } from '../../../utils/logger';
-import { beds24Queue } from '../../../infra/queues/queue.manager';
-import { metricsHelpers } from '../../../infra/metrics/prometheus';
+import { logger } from '../../../utils/logger.js';
+import { beds24Queue } from '../../../infra/queues/queue.manager.js';
+import { metricsHelpers } from '../../../infra/metrics/prometheus.js';
 export function registerWhapiWebhook(router) {
     router.post('/webhooks/whapi', async (req, res) => {
         try {
