@@ -5,7 +5,7 @@
     "buildCommand": "cd data-sync && npm ci && npm run build"
   },
   "deploy": {
-    "startCommand": "cd data-sync && npx prisma generate --schema ../prisma/schema.prisma && npm run start",
+    "startCommand": "cd data-sync && npx prisma generate --schema ../prisma/schema.prisma && cp -r ../node_modules/.prisma ./node_modules/ && cp -r ../node_modules/@prisma ./node_modules/ && npm run start",
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 3
   }
