@@ -1,7 +1,8 @@
-import { Queue, Worker, QueueScheduler } from 'bullmq';
+import { Queue, Worker } from 'bullmq';
 import { redis } from '../redis/redis.client';
 import { logger } from '../../utils/logger';
 import { syncSingleBooking, syncCancelledReservations, syncLeadsAndConfirmed } from '../../providers/beds24/sync';
+import { metricsHelpers } from '../metrics/prometheus';
 const QUEUE_CONFIG = {
     connection: redis,
     defaultJobOptions: {
@@ -16,10 +17,9 @@ const QUEUE_CONFIG = {
 };
 export const beds24Queue = new Queue('beds24-sync', QUEUE_CONFIG);
 export const deadLetterQueue = new Queue('beds24-dlq', { connection: redis });
-new QueueScheduler('beds24-sync', { connection: redis });
 export const beds24Worker = new Worker('beds24-sync', async (job) => {
     const { data } = job;
-    const startTime = Date.now();
+    const startTime = metricsHelpers.recordJobStart(data.type);
     logger.info({
         jobId: job.id,
         type: data.type,
@@ -30,6 +30,7 @@ export const beds24Worker = new Worker('beds24-sync', async (job) => {
         if (data.type === 'webhook') {
             const webhookData = data;
             await syncSingleBooking(webhookData.bookingId);
+            metricsHelpers.recordJobComplete(data.type, startTime, 'success');
             logger.info({
                 jobId: job.id,
                 bookingId: webhookData.bookingId,
@@ -39,6 +40,7 @@ export const beds24Worker = new Worker('beds24-sync', async (job) => {
         else if (data.type === 'single') {
             const singleData = data;
             await syncSingleBooking(singleData.bookingId);
+            metricsHelpers.recordJobComplete(data.type, startTime, 'success');
             logger.info({
                 jobId: job.id,
                 bookingId: singleData.bookingId,
@@ -48,6 +50,8 @@ export const beds24Worker = new Worker('beds24-sync', async (job) => {
         else if (data.type === 'cancelled') {
             const bulkData = data;
             await syncCancelledReservations(bulkData.dateFrom, bulkData.dateTo);
+            metricsHelpers.recordJobComplete(data.type, startTime, 'success');
+            metricsHelpers.recordReservationSync('cancelled', 'success');
             logger.info({
                 jobId: job.id,
                 dateFrom: bulkData.dateFrom,
@@ -58,6 +62,8 @@ export const beds24Worker = new Worker('beds24-sync', async (job) => {
         else if (data.type === 'leads') {
             const bulkData = data;
             await syncLeadsAndConfirmed(bulkData.dateFrom, bulkData.dateTo);
+            metricsHelpers.recordJobComplete(data.type, startTime, 'success');
+            metricsHelpers.recordReservationSync('leads', 'success');
             logger.info({
                 jobId: job.id,
                 dateFrom: bulkData.dateFrom,
@@ -65,11 +71,21 @@ export const beds24Worker = new Worker('beds24-sync', async (job) => {
                 duration: Date.now() - startTime
             }, 'Leads sync completed');
         }
+        else if (data.type === 'whapi') {
+            const whapiData = data;
+            logger.info({
+                jobId: job.id,
+                webhookType: whapiData.webhookType,
+                duration: Date.now() - startTime
+            }, 'Whapi webhook processed (placeholder)');
+            metricsHelpers.recordJobComplete(data.type, startTime, 'success');
+        }
         else {
             throw new Error(`Unknown job type: ${data.type}`);
         }
     }
     catch (error) {
+        metricsHelpers.recordJobComplete(data.type, startTime, 'failed');
         logger.error({
             jobId: job.id,
             error: error.message,
@@ -161,7 +177,7 @@ export async function getQueueStats() {
         beds24Queue.getFailedCount(),
         beds24Queue.getDelayedCount(),
     ]);
-    return {
+    const stats = {
         waiting,
         active,
         completed,
@@ -169,9 +185,12 @@ export async function getQueueStats() {
         delayed,
         total: waiting + active + completed + failed + delayed,
     };
+    await metricsHelpers.updateQueueMetrics(stats);
+    return stats;
 }
 export async function getJobById(jobId) {
-    return await beds24Queue.getJob(jobId);
+    const job = await beds24Queue.getJob(jobId);
+    return job || null;
 }
 export async function retryFailedJobs() {
     const failedJobs = await beds24Queue.getFailed();

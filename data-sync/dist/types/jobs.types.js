@@ -18,3 +18,11 @@ export const SingleSyncJobSchema = z.object({
     bookingId: z.string().min(1),
     priority: z.enum(['low', 'normal', 'high']).default('normal'),
 });
+export const WhapiJobSchema = z.object({
+    type: z.literal('whapi'),
+    source: z.literal('whapi'),
+    webhookType: z.string(),
+    data: z.any(),
+    timestamp: z.date().default(() => new Date()),
+    priority: z.enum(['low', 'normal', 'high']).default('normal'),
+});

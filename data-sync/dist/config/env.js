@@ -11,8 +11,11 @@ const envSchema = z.object({
     REDIS_HOST: z.string().default('localhost'),
     REDIS_PORT: z.coerce.number().default(6379),
     REDIS_PASSWORD: z.string().optional(),
-    LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
-    LOG_PRETTY: z.boolean().default(false),
+    LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error', 'development']).transform((val) => val === 'development' ? 'debug' : val),
+    LOG_PRETTY: z.coerce.boolean().default(false),
+    PROMETHEUS_ENABLED: z.coerce.boolean().default(true),
+    SWAGGER_ENABLED: z.coerce.boolean().default(true),
+    METRICS_PREFIX: z.string().default('data_sync_'),
 });
 function parseEnv() {
     try {

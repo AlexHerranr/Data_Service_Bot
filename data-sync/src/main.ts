@@ -1,15 +1,15 @@
 import express from 'express';
 import promBundle from 'express-prom-bundle';
 import swaggerUi from 'swagger-ui-express';
-import { connectPrisma } from './infra/db/prisma.client';
-import { connectRedis } from './infra/redis/redis.client';
-import { registerHealthRoute } from './server/routes/health.route';
-import { registerBeds24Webhook } from './server/routes/webhooks/beds24.route';
-import { registerQueuesRoute } from './server/routes/admin/queues.route';
-import { register } from './infra/metrics/prometheus';
-import { swaggerSpec } from './docs/openapi';
-import { env } from './config/env';
-import { logger } from './utils/logger';
+import { connectPrisma } from './infra/db/prisma.client.js';
+import { connectRedis } from './infra/redis/redis.client.js';
+import { registerHealthRoute } from './server/routes/health.route.js';
+import { registerBeds24Webhook } from './server/routes/webhooks/beds24.route.js';
+import { registerQueuesRoute } from './server/routes/admin/queues.route.js';
+import { register } from './infra/metrics/prometheus.js';
+import { swaggerSpec } from './docs/openapi.js';
+import { env } from './config/env.js';
+import { logger } from './utils/logger.js';
 
 async function main() {
   const app = express();

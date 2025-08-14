@@ -1,5 +1,6 @@
 import { logger } from '../../../utils/logger';
 import { addWebhookJob } from '../../../infra/queues/queue.manager';
+import { metricsHelpers } from '../../../infra/metrics/prometheus';
 function verifyHmac(req, res, next) {
     next();
 }
@@ -8,10 +9,11 @@ export function registerBeds24Webhook(router) {
         try {
             const { bookingId, action, status } = req.body;
             if (!bookingId || !action) {
-                return res.status(400).json({
+                res.status(400).json({
                     error: 'Missing required fields: bookingId, action',
                     received: false
                 });
+                return;
             }
             res.status(200).json({
                 status: 'accepted',
@@ -24,6 +26,7 @@ export function registerBeds24Webhook(router) {
                 action,
                 status
             }, 'Webhook received');
+            metricsHelpers.recordWebhook('beds24', action);
             if (action === 'created' || action === 'modified' || action === 'cancelled') {
                 const job = await addWebhookJob({
                     bookingId: String(bookingId),

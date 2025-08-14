@@ -43,7 +43,8 @@ export function registerQueuesRoute(router) {
             const { jobId } = req.params;
             const job = await getJobById(jobId);
             if (!job) {
-                return res.status(404).json({ error: 'Job not found' });
+                res.status(404).json({ error: 'Job not found' });
+                return;
             }
             res.json({
                 id: job.id,

@@ -2,6 +2,7 @@ import { logger } from '../../utils/logger';
 import { redis } from '../../infra/redis/redis.client';
 import { prisma } from '../../infra/db/prisma.client';
 import { getQueueStats } from '../../infra/queues/queue.manager';
+import { metricsHelpers } from '../../infra/metrics/prometheus';
 export function registerHealthRoute(router) {
     router.get('/health', async (req, res) => {
         const startTime = Date.now();
@@ -31,6 +32,10 @@ export function registerHealthRoute(router) {
             }
             const isHealthy = redisStatus === 'connected' && databaseStatus === 'connected';
             const responseTime = Date.now() - startTime;
+            metricsHelpers.updateConnectionStatus(redisStatus === 'connected', databaseStatus === 'connected');
+            metricsHelpers.updateSystemHealth('overall', isHealthy);
+            metricsHelpers.updateSystemHealth('redis', redisStatus === 'connected');
+            metricsHelpers.updateSystemHealth('database', databaseStatus === 'connected');
             const response = {
                 status: isHealthy ? 'healthy' : 'degraded',
                 timestamp: new Date().toISOString(),

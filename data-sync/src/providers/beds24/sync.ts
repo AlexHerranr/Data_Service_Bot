@@ -10,8 +10,8 @@ import {
   shouldSyncAsConfirmed,
   isCancelledBooking
 } from './utils';
-import { prisma } from '../../infra/db/prisma.client';
-import { logger } from '../../utils/logger';
+import { prisma } from '../../infra/db/prisma.client.js';
+import { logger } from '../../utils/logger.js';
 
 export interface SyncResult {
   processed: number;
