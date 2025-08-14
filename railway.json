@@ -5,7 +5,7 @@
     "buildCommand": "cd data-sync && npm ci && npm run build"
   },
   "deploy": {
-    "startCommand": "cd data-sync && npm run start",
+    "startCommand": "cd data-sync && npm run db:migrate && npm run start",
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 3
   }
