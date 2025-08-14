@@ -7,7 +7,7 @@ export const redis = new Redis(env.REDIS_URL, {
   retryStrategy: (times) => Math.min(times * 50, 2000),
   lazyConnect: true,
   keepAlive: 30000,
-  family: 4, // Force IPv4
+  family: 0, // Allow IPv4/IPv6 (required for Railway internal networking)
   commandTimeout: 5000,
   connectTimeout: 10000,
 });
