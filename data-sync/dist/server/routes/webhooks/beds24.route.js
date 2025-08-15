@@ -29,7 +29,13 @@ export function registerBeds24Webhook(router) {
                 timestamp: new Date().toISOString()
             });
             const bookingId = payload.id || payload.booking?.id || payload.bookingId;
-            const action = payload.action || 'MODIFY';
+            let action = payload.action || 'MODIFY';
+            if (action === 'created')
+                action = 'CREATED';
+            if (action === 'modified')
+                action = 'MODIFY';
+            if (action === 'cancelled')
+                action = 'CANCEL';
             if (!bookingId) {
                 logger.warn({ payload }, 'Beds24 webhook missing booking ID, skipping');
                 return;

@@ -68,8 +68,8 @@ export const beds24Worker = new Worker<JobData>(
           webhookType: data.type
         }, 'Processing Beds24 webhook');
 
-        // Para MODIFY o CANCEL, fetch booking completo y actualizar BD
-        if (action === 'MODIFY' || action === 'CANCEL') {
+        // Para CREATED, MODIFY o CANCEL, fetch booking completo y actualizar BD
+        if (action === 'CREATED' || action === 'MODIFY' || action === 'CANCEL') {
           await syncSingleBooking(bookingId);
           
           // Si es MODIFY, opcionalmente fetch messages

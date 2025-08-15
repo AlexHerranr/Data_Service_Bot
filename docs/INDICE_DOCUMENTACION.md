@@ -5,30 +5,36 @@
 ### 🏗️ **Funcionalidades Principales**
 - 📋 **[Checklist General](BOT_DATA_SERVICE_FUNCIONALIDADES.md)** - Lista completa de funcionalidades y pruebas
 
-### 🗄️ **1. Gestión de Base de Datos**
-- 📖 **[GUIA_BD_MANAGEMENT.md](GUIA_BD_MANAGEMENT.md)** - CRUD completo de tablas
-- 🔧 **[GUIA_BD_SCHEMA.md](GUIA_BD_SCHEMA.md)** - Modificación de esquemas
+### 🗄️ **1. Base de Datos**
+- 📖 **[database/GUIA_BD_MANAGEMENT.md](database/GUIA_BD_MANAGEMENT.md)** - CRUD completo de tablas ✅
+- 🏨 **[database/GUIA_TABLA_HOTELES.md](database/GUIA_TABLA_HOTELES.md)** - Mapeo de propiedades ✅
+- 📊 **[database/RESUMEN_BDSTATUS_AUTOMATICO.md](database/RESUMEN_BDSTATUS_AUTOMATICO.md)** - Sistema de estados ✅
+- 📈 **[database/GUIA_INVENTORY_ENDPOINTS.md](database/GUIA_INVENTORY_ENDPOINTS.md)** - API endpoints inventario
 
 ### 🏨 **2. Integración Beds24**
-- 📖 **[GUIA_BEDS24_WEBHOOKS.md](GUIA_BEDS24_WEBHOOKS.md)** - Webhooks completos ✅
-- 🔧 **[GUIA_BEDS24_API.md](GUIA_BEDS24_API.md)** - Endpoints de API
-- 📊 **[GUIA_BEDS24_SYNC.md](GUIA_BEDS24_SYNC.md)** - Sincronización masiva
+- 📖 **[beds24/GUIA_BEDS24_WEBHOOKS.md](beds24/GUIA_BEDS24_WEBHOOKS.md)** - Webhooks completos ✅
+- 🔧 **[beds24/GUIA_BEDS24_ENDPOINTS.md](beds24/GUIA_BEDS24_ENDPOINTS.md)** - Endpoints de API ✅
+- 📋 **[beds24/IMPLEMENTACION_FASE_BEDS24.md](beds24/IMPLEMENTACION_FASE_BEDS24.md)** - Fases implementación
 
 ### 📱 **3. Integración Whapi**
-- 📖 **[GUIA_WHAPI_MENSAJES.md](GUIA_WHAPI_MENSAJES.md)** - Envío de mensajes
-- 🔧 **[GUIA_WHAPI_MEDIA.md](GUIA_WHAPI_MEDIA.md)** - Manejo de archivos
-- 📊 **[GUIA_WHAPI_CHATS.md](GUIA_WHAPI_CHATS.md)** - Gestión de chats
+- 📖 **[whapi/GUIA_WHAPI_MENSAJES.md](whapi/GUIA_WHAPI_MENSAJES.md)** - Envío de mensajes 📝
+- 🔧 **[whapi/GUIA_WHAPI_MEDIA.md](whapi/GUIA_WHAPI_MEDIA.md)** - Manejo de archivos 📝
+- 📊 **[whapi/GUIA_WHAPI_CHATS.md](whapi/GUIA_WHAPI_CHATS.md)** - Gestión de chats 📝
 
-### ⚡ **4. Funcionalidades Avanzadas**
-- 🔄 **[GUIA_COLAS_WORKERS.md](GUIA_COLAS_WORKERS.md)** - Sistema de colas
-- 📈 **[GUIA_MONITOREO.md](GUIA_MONITOREO.md)** - Métricas y health checks
-- 🔒 **[GUIA_SEGURIDAD.md](GUIA_SEGURIDAD.md)** - Autenticación y HMAC
-- 🚨 **[GUIA_NOTIFICACIONES.md](GUIA_NOTIFICACIONES.md)** - Alertas y notificaciones
-- 📊 **[GUIA_REPORTING.md](GUIA_REPORTING.md)** - Generación de reportes
+### 🛠️ **4. Operaciones y Desarrollo**
+- 🚀 **[operations/DEVELOPMENT_SETUP.md](operations/DEVELOPMENT_SETUP.md)** - Setup desarrollo ✅
+- 🔧 **[operations/ENVIRONMENT_VARIABLES.md](operations/ENVIRONMENT_VARIABLES.md)** - Variables entorno ✅
+- 📊 **[operations/MONITORING_GUIDE.md](operations/MONITORING_GUIDE.md)** - Monitoreo y métricas ✅
+- 🚨 **[operations/TROUBLESHOOTING_COMMON_ISSUES.md](operations/TROUBLESHOOTING_COMMON_ISSUES.md)** - Solución problemas ✅
 
-### 🎯 **Documentación del Sistema**
-- 🏨 **[GUIA_TABLA_HOTELES.md](GUIA_TABLA_HOTELES.md)** - Mapeo de propiedades ✅
-- 📊 **[RESUMEN_BDSTATUS_AUTOMATICO.md](RESUMEN_BDSTATUS_AUTOMATICO.md)** - Sistema de estados ✅
+### 🔄 **5. Flujos de Negocio**
+- 📋 **[flows/ACTUALIZACION_BOOKINGS.md](flows/ACTUALIZACION_BOOKINGS.md)** - Webhook → Jobs → BD Update ✅
+
+### 🏗️ **Arquitectura y Deploy**
+- 🗄️ **[architecture/ESTRATEGIA_BD_COMPARTIDA.md](architecture/ESTRATEGIA_BD_COMPARTIDA.md)** - Estrategia de BD compartida
+- 🏛️ **[architecture/VISION_Y_ARQUITECTURA.md](architecture/VISION_Y_ARQUITECTURA.md)** - Visión general del sistema  
+- ⚠️ **[architecture/CONFLICTOS_Y_CONSIDERACIONES.md](architecture/CONFLICTOS_Y_CONSIDERACIONES.md)** - Consideraciones técnicas
+- 🚀 **[deployment/RAILWAY_DEPLOY_GUIDE.md](deployment/RAILWAY_DEPLOY_GUIDE.md)** - Guía de deploy en Railway
 
 ---
 
@@ -60,24 +66,38 @@
 
 | Funcionalidad | Guía | Estado |
 |---------------|------|--------|
-| **Webhooks Beds24** | GUIA_BEDS24_WEBHOOKS.md | ✅ Completa |
-| **Tabla Hoteles** | GUIA_TABLA_HOTELES.md | ✅ Completa |
-| **BD Status** | RESUMEN_BDSTATUS_AUTOMATICO.md | ✅ Completa |
-| **BD Management** | GUIA_BD_MANAGEMENT.md | 📝 Pendiente |
-| **Beds24 API** | GUIA_BEDS24_API.md | 📝 Pendiente |
-| **Whapi Mensajes** | GUIA_WHAPI_MENSAJES.md | 📝 Pendiente |
-| **Colas Workers** | GUIA_COLAS_WORKERS.md | 📝 Pendiente |
-| **Monitoreo** | GUIA_MONITOREO.md | 📝 Pendiente |
-| **Seguridad** | GUIA_SEGURIDAD.md | 📝 Pendiente |
+| **🗄️ BD Management** | database/GUIA_BD_MANAGEMENT.md | ✅ Completa |
+| **🏨 Webhooks Beds24** | beds24/GUIA_BEDS24_WEBHOOKS.md | ✅ Completa |
+| **🏨 Endpoints Beds24** | beds24/GUIA_BEDS24_ENDPOINTS.md | ✅ Completa |
+| **🛠️ Development Setup** | operations/DEVELOPMENT_SETUP.md | ✅ Completa |
+| **🛠️ Environment Variables** | operations/ENVIRONMENT_VARIABLES.md | ✅ Completa |
+| **🛠️ Monitoring Guide** | operations/MONITORING_GUIDE.md | ✅ Completa |
+| **🛠️ Troubleshooting** | operations/TROUBLESHOOTING_COMMON_ISSUES.md | ✅ Completa |
+| **🔄 Actualización Bookings** | flows/ACTUALIZACION_BOOKINGS.md | ✅ Completa |
+| **📱 Whapi Mensajes** | whapi/GUIA_WHAPI_MENSAJES.md | 📝 Pendiente |
+| **📱 Whapi Media** | whapi/GUIA_WHAPI_MEDIA.md | 📝 Pendiente |
 
 ---
 
 ## 🎯 **Próximos Pasos**
 
-1. **BD Management** - Crear endpoints CRUD
-2. **Beds24 API** - Completar integración 
-3. **Whapi** - Manejo de media
-4. **Seguridad** - Implementar autenticación
-5. **Testing** - Agregar tests comprehensivos
+1. **📱 Whapi Integration** - Completar documentación Whapi (mensajes, media, chats)
+2. **🔒 Security Guide** - Autenticación, rate limiting, best practices
+3. **🧪 Testing Strategy** - Documentación testing comprehensivo
+4. **🚀 CI/CD Pipeline** - Automatización deploy y tests
+5. **📊 Performance Tuning** - Optimización y scaling
 
-**Cada guía incluirá ejemplos prácticos, código real y troubleshooting específico.**
+## 📁 **Estructura Organizada**
+
+```
+docs/
+├── 🏗️ architecture/      # Estrategia, visión, conflictos
+├── 🗄️ database/          # BD management, mapeos, status
+├── 🏨 beds24/            # Webhooks, endpoints, implementación
+├── 📱 whapi/             # Mensajes, media, chats
+├── 🛠️ operations/        # Setup, monitoring, troubleshooting
+├── 🔄 flows/             # Flujos de negocio, triggers, jobs
+└── 🚀 deployment/        # Railway, producción
+```
+
+**Documentación técnica completa y bien organizada por especialización.**

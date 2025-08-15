@@ -20,6 +20,12 @@
     "monitor": "tsx scripts/monitor.ts",
     "monitor:continuous": "tsx scripts/monitor.ts -- --continuous",
     "monitor:json": "tsx scripts/monitor.ts -- --format json",
+    "bulk-update": "tsx scripts/bulk-update-bookings.ts",
+    "bulk-update:dry": "tsx scripts/bulk-update-bookings.ts -- --dry-run",
+    "detect:missing": "tsx scripts/detect-missing-bookings.ts",
+    "sync:manual": "tsx scripts/manual-sync-bookings.ts",
+    "update:messages": "tsx scripts/update-all-messages.ts",
+    "update:messages:specific": "tsx scripts/update-all-messages.ts",
     "typecheck": "npx tsc --noEmit",
     "test-build": "npm run typecheck && npm run build"
   },
@@ -47,6 +53,7 @@
     "@types/ioredis": "^4.28.10",
     "@types/swagger-jsdoc": "^6.0.4",
     "@types/swagger-ui-express": "^4.1.8",
+    "tsx": "^4.20.4",
     "vitest": "^2.0.5"
   }
 }

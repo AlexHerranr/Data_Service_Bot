@@ -19,7 +19,16 @@
       "Bash(npm run build:*)",
       "Bash(npm start)",
       "Bash(winget install:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(mkdir:*)",
+      "Bash(npm run:*)",
+      "Bash(psql:*)",
+      "Bash(docker-compose up:*)",
+      "Bash(docker compose:*)",
+      "Bash(npm test)",
+      "Bash(timeout 30 npm run dev)",
+      "Bash(DATABASE_URL=\"postgresql://postgres:slTVdKuHwjEfvxJEjGtMVTwSTYzdbfuR@turntable.proxy.rlwy.net:43146/railway\" npx prisma db pull --schema=prisma/schema.prisma)",
+      "Bash(DATABASE_URL=:*)"
     ],
     "defaultMode": "acceptEdits"
   }

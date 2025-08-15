@@ -40,7 +40,7 @@ export const beds24Worker = new Worker('beds24-sync', async (job) => {
                 action,
                 webhookType: data.type
             }, 'Processing Beds24 webhook');
-            if (action === 'MODIFY' || action === 'CANCEL') {
+            if (action === 'CREATED' || action === 'MODIFY' || action === 'CANCEL') {
                 await syncSingleBooking(bookingId);
                 if (action === 'MODIFY') {
                     try {

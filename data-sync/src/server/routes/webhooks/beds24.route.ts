@@ -41,7 +41,12 @@ export function registerBeds24Webhook(router: Router): void {
 
       // Básico: detectar ID y acción
       const bookingId = payload.id || payload.booking?.id || payload.bookingId;
-      const action = payload.action || 'MODIFY'; // Default action
+      
+      // Mapear acciones de Beds24 correctamente
+      let action = payload.action || 'MODIFY';
+      if (action === 'created') action = 'CREATED';
+      if (action === 'modified') action = 'MODIFY'; 
+      if (action === 'cancelled') action = 'CANCEL';
       
       if (!bookingId) {
         logger.warn({ payload }, 'Beds24 webhook missing booking ID, skipping');
