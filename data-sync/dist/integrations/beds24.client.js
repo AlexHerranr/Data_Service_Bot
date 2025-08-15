@@ -3,6 +3,8 @@ import { logger } from '../utils/logger.js';
 import { env } from '../config/env.js';
 export class Beds24Client {
     api;
+    writeRefreshToken = null;
+    isInitialized = false;
     constructor() {
         this.api = axios.create({
             baseURL: env.BEDS24_API_URL,
@@ -13,6 +15,42 @@ export class Beds24Client {
             config.headers['token'] = env.BEDS24_TOKEN;
             return config;
         });
+    }
+    async initialize() {
+        if (this.isInitialized) {
+            logger.debug('Beds24 client already initialized');
+            return;
+        }
+        try {
+            if (!env.BEDS24_INVITE_CODE_WRITE) {
+                throw new Error('BEDS24_INVITE_CODE_WRITE not configured for write operations');
+            }
+            logger.info('🚀 Initializing Beds24 write token from Railway IP');
+            const setupResponse = await axios.get(`${env.BEDS24_API_URL}/authentication/setup`, {
+                headers: {
+                    'code': env.BEDS24_INVITE_CODE_WRITE,
+                    'deviceName': 'Railway-Production-Auto'
+                }
+            });
+            this.writeRefreshToken = setupResponse.data.refreshToken;
+            this.isInitialized = true;
+            logger.info({
+                tokenLength: this.writeRefreshToken?.length,
+                expiresIn: setupResponse.data.expiresIn
+            }, '✅ Beds24 write token initialized successfully from Railway IP');
+        }
+        catch (error) {
+            logger.error({
+                error: error.message,
+                response: error.response?.data
+            }, '❌ Failed to initialize Beds24 write token');
+            throw error;
+        }
+    }
+    ensureInitialized() {
+        if (!this.isInitialized || !this.writeRefreshToken) {
+            throw new Error('Beds24 client not initialized. Call initialize() first.');
+        }
     }
     async getBookings(params = {}) {
         try {
@@ -79,6 +117,7 @@ export class Beds24Client {
     }
     async upsertBooking(bookingData) {
         try {
+            this.ensureInitialized();
             const bookingsArray = Array.isArray(bookingData) ? bookingData : [bookingData];
             const createCount = bookingsArray.filter(b => !b.id).length;
             const updateCount = bookingsArray.filter(b => b.id).length;
@@ -87,17 +126,9 @@ export class Beds24Client {
                 creates: createCount,
                 updates: updateCount
             }, 'Upserting booking(s) via POST /bookings');
-            if (!env.BEDS24_WRITE_REFRESH_TOKEN) {
-                throw new Error('BEDS24_WRITE_REFRESH_TOKEN not configured for write operations');
-            }
-            logger.debug('Refreshing access token for write operation');
-            logger.info({
-                apiUrl: env.BEDS24_API_URL,
-                tokenLength: env.BEDS24_WRITE_REFRESH_TOKEN?.length,
-                tokenStart: env.BEDS24_WRITE_REFRESH_TOKEN?.substring(0, 10)
-            }, 'DEBUG: Token details before refresh');
+            logger.debug('Refreshing access token with Railway-generated token');
             const refreshResponse = await axios.get(`${env.BEDS24_API_URL}/authentication/token`, {
-                headers: { 'refreshToken': env.BEDS24_WRITE_REFRESH_TOKEN }
+                headers: { 'refreshToken': this.writeRefreshToken }
             });
             const accessToken = refreshResponse.data.token;
             const response = await axios.post(`${env.BEDS24_API_URL}/bookings`, bookingsArray, {

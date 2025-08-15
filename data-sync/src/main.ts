@@ -9,6 +9,7 @@ import { registerWhapiWebhook } from './server/routes/webhooks/whapi.route.js';
 import { registerQueuesRoute } from './server/routes/admin/queues.route.js';
 import { registerTablesRoute } from './server/routes/tables.route.js';
 import { beds24Routes } from './server/routes/beds24/beds24.routes.js';
+import { beds24Client } from './integrations/beds24.client.js';
 import { register } from './infra/metrics/prometheus.js';
 import { swaggerSpec } from './docs/openapi.js';
 import { env } from './config/env.js';
@@ -35,6 +36,15 @@ async function main() {
   // Connect to database and Redis
   await connectPrisma();
   await connectRedis();
+  
+  // Initialize Beds24 client with auth from Railway IP
+  try {
+    await beds24Client.initialize();
+    logger.info('✅ Beds24 client initialized successfully');
+  } catch (error: any) {
+    logger.warn({ error: error.message }, '⚠️ Beds24 write operations will not be available - continuing without write auth');
+    // Continue startup even if Beds24 init fails (READ operations still work)
+  }
   
   // Routes
   const router = express.Router();

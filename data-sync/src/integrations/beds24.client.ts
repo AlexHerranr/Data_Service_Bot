@@ -4,6 +4,8 @@ import { env } from '../config/env.js';
 
 export class Beds24Client {
   private api: AxiosInstance;
+  private writeRefreshToken: string | null = null;
+  private isInitialized: boolean = false;
   
   constructor() {
     this.api = axios.create({
@@ -20,7 +22,56 @@ export class Beds24Client {
     });
   }
 
-  // Métodos simplificados - sin Redis, sin cache
+  /**
+   * Inicializar cliente con auth desde Railway IP
+   * Se ejecuta una vez al startup de la aplicación
+   */
+  async initialize(): Promise<void> {
+    if (this.isInitialized) {
+      logger.debug('Beds24 client already initialized');
+      return;
+    }
+
+    try {
+      if (!env.BEDS24_INVITE_CODE_WRITE) {
+        throw new Error('BEDS24_INVITE_CODE_WRITE not configured for write operations');
+      }
+
+      logger.info('🚀 Initializing Beds24 write token from Railway IP');
+      
+      // Generar refresh token usando invite code desde IP actual de Railway
+      const setupResponse = await axios.get(`${env.BEDS24_API_URL}/authentication/setup`, {
+        headers: { 
+          'code': env.BEDS24_INVITE_CODE_WRITE,
+          'deviceName': 'Railway-Production-Auto'
+        }
+      });
+
+      this.writeRefreshToken = setupResponse.data.refreshToken;
+      this.isInitialized = true;
+
+      logger.info({
+        tokenLength: this.writeRefreshToken?.length,
+        expiresIn: setupResponse.data.expiresIn
+      }, '✅ Beds24 write token initialized successfully from Railway IP');
+
+    } catch (error: any) {
+      logger.error({ 
+        error: error.message,
+        response: error.response?.data 
+      }, '❌ Failed to initialize Beds24 write token');
+      throw error;
+    }
+  }
+
+  /**
+   * Verificar que el cliente esté inicializado para operaciones WRITE
+   */
+  private ensureInitialized(): void {
+    if (!this.isInitialized || !this.writeRefreshToken) {
+      throw new Error('Beds24 client not initialized. Call initialize() first.');
+    }
+  }
 
   // ========== READ OPERATIONS (usar read token) ==========
 
@@ -108,10 +159,13 @@ export class Beds24Client {
    * Crear o actualizar reservas (Beds24 usa solo POST para ambos)
    * Si el objeto tiene "id" es update, si no lo tiene es create
    * 
-   * ESTRATEGIA SIMPLIFICADA: Refresh directo sin Redis para máxima compatibilidad
+   * NUEVA ESTRATEGIA: Auth en startup desde Railway IP
    */
   async upsertBooking(bookingData: any[] | any): Promise<any> {
     try {
+      // Verificar que el cliente esté inicializado
+      this.ensureInitialized();
+      
       // Ensure bookingData is an array as expected by Beds24 API
       const bookingsArray = Array.isArray(bookingData) ? bookingData : [bookingData];
       
@@ -124,21 +178,11 @@ export class Beds24Client {
         updates: updateCount 
       }, 'Upserting booking(s) via POST /bookings');
 
-      // ESTRATEGIA SIMPLIFICADA: Refresh directo sin cache Redis
-      // Ideal para operaciones WRITE infrecuentes (<1/min)
-      if (!env.BEDS24_WRITE_REFRESH_TOKEN) {
-        throw new Error('BEDS24_WRITE_REFRESH_TOKEN not configured for write operations');
-      }
-
-      logger.debug('Refreshing access token for write operation');
-      logger.info({ 
-        apiUrl: env.BEDS24_API_URL,
-        tokenLength: env.BEDS24_WRITE_REFRESH_TOKEN?.length,
-        tokenStart: env.BEDS24_WRITE_REFRESH_TOKEN?.substring(0, 10)
-      }, 'DEBUG: Token details before refresh');
+      // Usar refresh token generado en startup desde Railway IP
+      logger.debug('Refreshing access token with Railway-generated token');
       
       const refreshResponse = await axios.get(`${env.BEDS24_API_URL}/authentication/token`, {
-        headers: { 'refreshToken': env.BEDS24_WRITE_REFRESH_TOKEN }
+        headers: { 'refreshToken': this.writeRefreshToken }
       });
       const accessToken = refreshResponse.data.token;
       
