@@ -26,6 +26,7 @@
     "sync:manual": "tsx scripts/manual-sync-bookings.ts",
     "update:messages": "tsx scripts/update-all-messages.ts",
     "update:messages:specific": "tsx scripts/update-all-messages.ts",
+    "test:railway-token": "tsx scripts/test-railway-token.ts",
     "typecheck": "npx tsc --noEmit",
     "test-build": "npm run typecheck && npm run build"
   },
