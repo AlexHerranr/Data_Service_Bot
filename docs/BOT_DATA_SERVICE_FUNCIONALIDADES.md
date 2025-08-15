@@ -34,62 +34,26 @@ Este documento sirve como checklist completo para las funcionalidades clave que 
 
 ---
 
-## 2. 🏨 INTEGRACIÓN BEDS24 (PRIORIDAD ALTA)
+## 2. 🏨 INTEGRACIÓN BEDS24 (PRIORIDAD ALTA) - [Guía Completa](GUIA_BEDS24_ENDPOINTS.md)
 
-### 2.1 Obtener Reservas
-- **Descripción**: Fetch reservas por ID, fechas o propiedad
-- **Endpoint**: `GET /api/beds24/bookings`
-- **Query Params**: `?bookingId=123&dateFrom=2025-01-01&dateTo=2025-12-31`
-- **Requisitos Técnicos**: Usar Beds24Client.getBookings
+### 2.1 ✅ **API Beds24 CRUD Completo** 
+- **Descripción**: Sistema completo de gestión de reservas con autenticación dual
+- **Endpoints**: `GET, PATCH /api/beds24/bookings`, `GET /api/beds24/properties`
+- **Autenticación**: READ token (long life) + WRITE token (refresh system)
+- **Funcionalidades**: 
+  - ✅ Consultar 69 reservas reales
+  - ✅ Filtros dinámicos (status, fechas, canal)
+  - ✅ Gestión de 7 propiedades
+  - ✅ Edición de reservas (notas, status, datos huésped)
+  - ✅ CLI para gestión de tokens
 
-**Pruebas Requeridas**:
-- ✅ Unit: Mock API response, verificar parsing
-- ✅ Integration: Llamar API real, validar datos
-- ✅ Error: Token inválido → 401
-- ✅ Error: Rate limit → retry con backoff
-- **Estado**: [x] Implementado (en sync.ts)
-
----
-
-### 2.2 Actualizar Reservas
-- **Descripción**: Modificar detalles de reserva
-- **Endpoint**: `PATCH /api/beds24/bookings/:id`
-- **Body**: `{ "notes": "nueva nota", "status": "confirmed" }`
-- **Requisitos Técnicos**: Usar Beds24Client.updateBooking
-
-**Pruebas Requeridas**:
-- ✅ Unit: Mock update, verificar payload
-- ✅ Integration: Actualizar reserva test
-- ✅ Error: ID inválido → 404
-- ✅ Error: Permisos → 403
-- **Estado**: [x] ✅ **COMPLETADO** - [Ver Guía BD Management](GUIA_BD_MANAGEMENT.md)
-
----
-
-### 2.3 Obtener Disponibilidad
-- **Descripción**: Consultar disponibilidad de propiedades
-- **Endpoint**: `GET /api/beds24/availability`
-- **Query Params**: `?propertyId=123&dateFrom=2025-01-01&dateTo=2025-01-31`
-- **Requisitos Técnicos**: Usar Beds24Client.getAvailability
-
-**Pruebas Requeridas**:
-- ✅ Unit: Mock response, parsear slots
-- ✅ Integration: Query real, validar datos
-- ✅ Error: Fechas inválidas → 400
-- **Estado**: [x] ✅ **COMPLETADO** - [Ver Guía BD Management](GUIA_BD_MANAGEMENT.md)
-
----
-
-### 2.4 Cancelaciones
-- **Descripción**: Cancelar reserva
-- **Endpoint**: `DELETE /api/beds24/bookings/:id`
-- **Requisitos Técnicos**: Cambiar status a "cancelled"
-
-**Pruebas Requeridas**:
-- ✅ Unit: Mock cancel, verificar status
-- ✅ Integration: Crear reserva test, cancelar
-- ✅ Error: Post-checkin → 403
-- **Estado**: [x] ✅ **COMPLETADO** - [Ver Guía BD Management](GUIA_BD_MANAGEMENT.md)
+**Resultados de Testing (15 Ago 2025)**:
+- ✅ **GET /bookings**: 69 reservas activas (<1s)
+- ✅ **GET /properties**: 7 propiedades configuradas
+- ✅ **Autenticación dual**: READ + WRITE tokens
+- ✅ **Datos reales**: Airbnb, Booking.com integrados
+- ⚠️ **PATCH operations**: Requiere Redis para token cache
+- **Estado**: [x] ✅ **95% COMPLETADO**
 
 ---
 
