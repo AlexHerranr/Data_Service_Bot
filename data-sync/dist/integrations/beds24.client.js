@@ -91,6 +91,11 @@ export class Beds24Client {
                 throw new Error('BEDS24_WRITE_REFRESH_TOKEN not configured for write operations');
             }
             logger.debug('Refreshing access token for write operation');
+            logger.info({
+                apiUrl: env.BEDS24_API_URL,
+                tokenLength: env.BEDS24_WRITE_REFRESH_TOKEN?.length,
+                tokenStart: env.BEDS24_WRITE_REFRESH_TOKEN?.substring(0, 10)
+            }, 'DEBUG: Token details before refresh');
             const refreshResponse = await axios.get(`${env.BEDS24_API_URL}/authentication/token`, {
                 headers: { 'refreshToken': env.BEDS24_WRITE_REFRESH_TOKEN }
             });
