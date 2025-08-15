@@ -37,7 +37,7 @@ async function main() {
   await connectPrisma();
   await connectRedis();
   
-  // Initialize Beds24 client with auth from Railway IP
+  // Initialize Beds24 client with persistent auth (Redis cache)
   try {
     await beds24Client.initialize();
     logger.info('✅ Beds24 client initialized successfully');
