@@ -2,15 +2,16 @@ import { Router, Request, Response } from 'express';
 import { logger } from '../../utils/logger.js';
 import { prisma } from '../../infra/db/prisma.client.js';
 
-const VALID_TABLES = ['ClientView', 'Booking', 'Leads', 'hotel_apartments'] as const;
+const VALID_TABLES = ['ClientView', 'Booking', 'Leads', 'hotel_apartments', 'IA_CMR_Clientes'] as const;
 type ValidTable = typeof VALID_TABLES[number];
 
 // Mapeo de nombres API → nombres modelo Prisma (camelCase)
 const TABLE_TO_PRISMA_MODEL: Record<ValidTable, string> = {
   'ClientView': 'clientView',
   'Booking': 'booking', 
-  'Leads': 'lead',  // Singular
-  'hotel_apartments': 'hotel_apartments'
+  'Leads': 'leads',  // Plural (como en schema)
+  'hotel_apartments': 'hotel_apartments',
+  'IA_CMR_Clientes': 'iA_CMR_Clientes'
 };
 
 function isValidTable(table: string): table is ValidTable {
@@ -43,8 +44,8 @@ export function registerTablesRoute(router: Router): void {
       const where = Object.keys(filters).length > 0 ? filters : undefined;
       
       // Configurar ordenación según la tabla
-      let orderBy: any = { id: 'desc' }; // Default para reservas, prospectos, apartamentos
-      if (tableName === 'ClientView') {
+      let orderBy: any = { id: 'desc' }; // Default para Booking, Leads, hotel_apartments
+      if (tableName === 'ClientView' || tableName === 'IA_CMR_Clientes') {
         orderBy = { phoneNumber: 'asc' }; // phoneNumber es string, mejor asc
       }
       
@@ -94,7 +95,7 @@ export function registerTablesRoute(router: Router): void {
       
       // Construir where clause según la tabla
       let whereClause: any;
-      if (tableName === 'ClientView') {
+      if (tableName === 'ClientView' || tableName === 'IA_CMR_Clientes') {
         whereClause = { phoneNumber: id }; // phoneNumber es string
       } else {
         whereClause = { id: parseInt(id) }; // id es number para otras tablas
@@ -182,7 +183,7 @@ export function registerTablesRoute(router: Router): void {
       
       // Construir where clause según la tabla
       let whereClause: any;
-      if (tableName === 'ClientView') {
+      if (tableName === 'ClientView' || tableName === 'IA_CMR_Clientes') {
         whereClause = { phoneNumber: id }; // phoneNumber es string
       } else {
         whereClause = { id: parseInt(id) }; // id es number para otras tablas
@@ -237,7 +238,7 @@ export function registerTablesRoute(router: Router): void {
       
       // Construir where clause según la tabla
       let whereClause: any;
-      if (tableName === 'ClientView') {
+      if (tableName === 'ClientView' || tableName === 'IA_CMR_Clientes') {
         whereClause = { phoneNumber: id }; // phoneNumber es string
       } else {
         whereClause = { id: parseInt(id) }; // id es number para otras tablas

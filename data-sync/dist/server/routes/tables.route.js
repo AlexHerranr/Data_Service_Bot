@@ -1,11 +1,12 @@
 import { logger } from '../../utils/logger.js';
 import { prisma } from '../../infra/db/prisma.client.js';
-const VALID_TABLES = ['ClientView', 'Booking', 'Leads', 'hotel_apartments'];
+const VALID_TABLES = ['ClientView', 'Booking', 'Leads', 'hotel_apartments', 'IA_CMR_Clientes'];
 const TABLE_TO_PRISMA_MODEL = {
     'ClientView': 'clientView',
     'Booking': 'booking',
-    'Leads': 'lead',
-    'hotel_apartments': 'hotel_apartments'
+    'Leads': 'leads',
+    'hotel_apartments': 'hotel_apartments',
+    'IA_CMR_Clientes': 'iA_CMR_Clientes'
 };
 function isValidTable(table) {
     return VALID_TABLES.includes(table);
@@ -29,7 +30,7 @@ export function registerTablesRoute(router) {
             const model = prisma[prismaModelName];
             const where = Object.keys(filters).length > 0 ? filters : undefined;
             let orderBy = { id: 'desc' };
-            if (tableName === 'ClientView') {
+            if (tableName === 'ClientView' || tableName === 'IA_CMR_Clientes') {
                 orderBy = { phoneNumber: 'asc' };
             }
             const [data, total] = await Promise.all([
@@ -70,7 +71,7 @@ export function registerTablesRoute(router) {
             const prismaModelName = TABLE_TO_PRISMA_MODEL[tableName];
             const model = prisma[prismaModelName];
             let whereClause;
-            if (tableName === 'ClientView') {
+            if (tableName === 'ClientView' || tableName === 'IA_CMR_Clientes') {
                 whereClause = { phoneNumber: id };
             }
             else {
@@ -139,7 +140,7 @@ export function registerTablesRoute(router) {
             const prismaModelName = TABLE_TO_PRISMA_MODEL[tableName];
             const model = prisma[prismaModelName];
             let whereClause;
-            if (tableName === 'ClientView') {
+            if (tableName === 'ClientView' || tableName === 'IA_CMR_Clientes') {
                 whereClause = { phoneNumber: id };
             }
             else {
@@ -182,7 +183,7 @@ export function registerTablesRoute(router) {
             const prismaModelName = TABLE_TO_PRISMA_MODEL[tableName];
             const model = prisma[prismaModelName];
             let whereClause;
-            if (tableName === 'ClientView') {
+            if (tableName === 'ClientView' || tableName === 'IA_CMR_Clientes') {
                 whereClause = { phoneNumber: id };
             }
             else {

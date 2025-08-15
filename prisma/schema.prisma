@@ -1,7 +1,7 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  output        = "../data-sync/node_modules/.prisma/client"
   binaryTargets = ["native", "debian-openssl-3.0.x"]
-  output = "../data-sync/node_modules/.prisma/client"
 }
 
 datasource db {
@@ -62,7 +62,6 @@ model Booking {
   lastUpdatedBD DateTime @default(now())
   raw           Json?
   BDStatus      String?
-  Leads         Leads?
 
   @@index([arrivalDate])
   @@index([bookingId])
@@ -73,28 +72,30 @@ model Booking {
   @@index([phone])
   @@index([propertyName, departureDate])
   @@index([status])
-  @@index([BDStatus])
-  @@index([BDStatus], map: "idx_Booking_BDStatus")
 }
 
 model Leads {
-  id            Int      @id @default(autoincrement())
-  bookingId     String?  @unique
-  phone         String
-  guestName     String?
-  propertyName  String?
-  arrivalDate   String
-  departureDate String?
-  totalPersons  Int?
-  source        String
-  channel       String?
-  priority      String   @default("media")
-  notes         String?
-  createdAt     DateTime @default(now())
-  lastUpdatedLeads DateTime @default(now())
-  numNights     Int?
-  leadNotes     String?
-  Booking       Booking? @relation(fields: [bookingId], references: [bookingId], onDelete: Cascade, onUpdate: NoAction, map: "Leads_booking_fk")
+  id               Int       @id @default(autoincrement())
+  bookingId        String?   @unique
+  phone            String
+  guestName        String?
+  propertyName     String?
+  arrivalDate      String
+  departureDate    String?
+  totalPersons     Int?
+  source           String
+  channel          String?
+  priority         String    @default("media")
+  notes            String?
+  createdAt        DateTime  @default(now())
+  lastUpdatedLeads DateTime  @default(now())
+  numNights        Int?
+  leadType         String
+  estimatedValue   String?
+  assignedTo       String?
+  lastContactAt    DateTime?
+  nextFollowUp     DateTime?
+  lastUpdated      DateTime  @default(now())
 
   @@index([arrivalDate])
   @@index([phone])
@@ -102,4 +103,19 @@ model Leads {
   @@index([source])
   @@index([arrivalDate], map: "idx_Leads_arrivalDate")
   @@index([phone], map: "idx_Leads_phone")
+  @@index([assignedTo])
+  @@index([lastContactAt])
+  @@index([leadType])
+  @@index([nextFollowUp])
+}
+
+model IA_CMR_Clientes {
+  phoneNumber        String    @id
+  profileStatus      String?
+  proximaAccion      String?
+  fechaProximaAccion DateTime?
+  prioridad          Int?
+
+  @@index([fechaProximaAccion])
+  @@index([prioridad])
 }
