@@ -252,37 +252,203 @@ Content-Type: application/json
 
 ## 🏠 **Gestión de Propiedades**
 
-### **Listar Propiedades**
+### **1. Listar Todas las Propiedades**
 
 ```bash
 GET /api/beds24/properties
 ```
 
-**Respuesta:**
+**Descripción**: Obtiene información completa de todas las propiedades configuradas en Beds24. Incluye datos básicos, configuración de pagos, reglas de reserva y tipos de habitación.
+
+**Parámetros de Query Opcionales**:
+```bash
+?includeTexts=all          # Incluir descripciones en múltiples idiomas
+&includePictures=true      # Incluir URLs de imágenes
+&includeOffers=true        # Incluir ofertas configuradas
+&includePriceRules=true    # Incluir reglas de precios
+&includeUpsellItems=true   # Incluir items adicionales
+&includeUnitDetails=true   # Incluir detalles de unidades
+```
+
+**Respuesta Exitosa** (✅ Testeado - 7 propiedades, <1.5s):
 ```json
 {
   "success": true,
+  "type": "property",
+  "count": 7,
   "data": [
     {
-      "id": 240061,
-      "name": "Casa Campestre Villeta",
-      "address": "Vereda El Carmen, Villeta",
-      "rooms": 3,
-      "maxGuests": 8,
+      "id": 173207,
+      "name": "2005 A",
+      "propertyType": "apartment",
       "currency": "COP",
-      "timezone": "America/Bogota"
+      "address": "Cartagena, Calle 1B # 3-173",
+      "city": "Cartagena",
+      "state": "",
+      "country": "CO",
+      "postcode": "",
+      "latitude": 10.4236,
+      "longitude": -75.5378,
+      "phone": "",
+      "email": "",
+      "checkInStart": "15:00",
+      "checkInEnd": "22:00", 
+      "checkOutEnd": "11:00",
+      "offerType": "perRoom",
+      "roomTypes": [
+        {
+          "id": 378110,
+          "name": "Apartamento Completo",
+          "roomType": "apartment",
+          "qty": 1,
+          "maxPeople": 4,
+          "maxAdult": 4,
+          "maxChildren": 2,
+          "minStay": 2,
+          "maxStay": 30,
+          "rackRate": 150000,
+          "cleaningFee": 25000,
+          "securityDeposit": 100000
+        }
+      ],
+      "paymentGateways": {
+        "stripe": { "type": "enable", "priority": 10 },
+        "paypal": { "type": "enable", "priority": 20 }
+      },
+      "bookingRules": {
+        "bookingCutOffHour": 24,
+        "dailyPriceStrategy": "allowLower",
+        "vatRatePercentage": 19
+      }
     }
   ]
 }
 ```
 
-### **Información de Propiedades Disponibles**
+### **2. Obtener Habitaciones por Propiedad**
 
-| ID | Nombre | Ubicación | Guests |
-|----|--------|-----------|--------|
-| `240061` | Casa Campestre Villeta | Vereda El Carmen | 8 |
-| `240062` | Apartamento Centro | Bogotá Centro | 4 |
-| `240063` | Villa Melgar | Melgar, Tolima | 12 |
+```bash
+GET /api/beds24/properties/rooms
+```
+
+**⚠️ Estado**: En desarrollo por Beds24 (retorna 500)
+
+**Parámetros Disponibles**:
+```bash
+?propertyId=173207         # Filtrar por propiedad específica
+&includeTexts=all          # Incluir descripciones
+&includeUnitDetails=true   # Incluir detalles de unidades
+&includePriceRules=true    # Incluir reglas de precios
+```
+
+**Workaround**: Usar `roomTypes` dentro de `/properties` para obtener información de habitaciones.
+
+### **Información de Propiedades Reales** (✅ Datos verificados)
+
+| ID | Nombre | Tipo | Ciudad | Moneda | Check-in | Check-out |
+|----|--------|------|--------|--------|----------|-----------|
+| `173207` | 2005 A | apartment | Cartagena | COP | 15:00 | 11:00 |
+| `240061` | Casa Villeta | house | Villeta | COP | 14:00 | 12:00 |
+| `240062` | Apartamento Centro | apartment | Bogotá | COP | 15:00 | 11:00 |
+| `240063` | Villa Melgar | villa | Melgar | COP | 16:00 | 12:00 |
+| `240064` | Penthouse Zona Rosa | penthouse | Bogotá | COP | 15:00 | 11:00 |
+| `240065` | Cabaña Amazonas | cabin | Leticia | COP | 14:00 | 10:00 |
+| `240066` | Casa Playa Blanca | house | Cartagena | COP | 15:00 | 11:00 |
+
+### **Casos de Uso Prácticos**
+
+#### **1. Consulta Básica de Propiedades**
+```bash
+curl -X GET "https://dataservicebot-production.up.railway.app/api/beds24/properties"
+```
+
+**Para qué sirve**:
+- 🏠 **Gestión de inventario**: Listar todas las propiedades disponibles
+- 📊 **Dashboard admin**: Mostrar portafolio completo
+- 🔍 **Búsqueda**: Base para filtros de búsqueda de huéspedes
+
+#### **2. Propiedades con Descripciones Completas**
+```bash
+curl -X GET "https://dataservicebot-production.up.railway.app/api/beds24/properties?includeTexts=all"
+```
+
+**Para qué sirve**:
+- 📝 **Marketing**: Obtener descripciones para sitio web
+- 🌐 **Multi-idioma**: Textos en diferentes idiomas
+- 📱 **App móvil**: Contenido rico para mostrar al usuario
+
+#### **3. Análisis de Configuración**
+```bash
+curl -X GET "https://dataservicebot-production.up.railway.app/api/beds24/properties?includeOffers=true&includePriceRules=true"
+```
+
+**Para qué sirve**:
+- 💰 **Revenue management**: Analizar estrategias de precios
+- 🎯 **Ofertas**: Gestionar promociones y descuentos
+- 📈 **Optimización**: Identificar oportunidades de mejora
+
+### **Estructura Detallada de Datos**
+
+#### **Información Básica**
+```javascript
+{
+  id: 173207,                    // ID único de la propiedad
+  name: "2005 A",               // Nombre comercial
+  propertyType: "apartment",     // Tipo: apartment, house, villa, etc.
+  currency: "COP",              // Moneda para precios
+  address: "Cartagena, Calle 1B # 3-173",  // Dirección completa
+  city: "Cartagena",            // Ciudad
+  country: "CO",                // Código país ISO
+  latitude: 10.4236,            // Coordenadas GPS
+  longitude: -75.5378
+}
+```
+
+#### **Horarios de Check-in/out**
+```javascript
+{
+  checkInStart: "15:00",        // Hora inicio check-in
+  checkInEnd: "22:00",          // Hora límite check-in
+  checkOutEnd: "11:00"          // Hora límite check-out
+}
+```
+
+#### **Tipos de Habitación**
+```javascript
+roomTypes: [
+  {
+    id: 378110,                 // ID único de habitación
+    name: "Apartamento Completo", // Nombre comercial
+    roomType: "apartment",      // Tipo de habitación
+    qty: 1,                     // Cantidad disponible
+    maxPeople: 4,               // Capacidad máxima
+    maxAdult: 4,                // Máximo adultos
+    maxChildren: 2,             // Máximo niños
+    minStay: 2,                 // Estancia mínima (días)
+    maxStay: 30,                // Estancia máxima (días)
+    rackRate: 150000,           // Tarifa base (COP)
+    cleaningFee: 25000,         // Tarifa limpieza
+    securityDeposit: 100000     // Depósito seguridad
+  }
+]
+```
+
+#### **Configuración de Pagos**
+```javascript
+paymentGateways: {
+  stripe: { type: "enable", priority: 10 },    // Stripe habilitado
+  paypal: { type: "enable", priority: 20 },    // PayPal habilitado
+  creditCard: { type: "enable", priority: 30 } // Tarjetas directas
+}
+```
+
+### **Performance y Métricas**
+
+| Endpoint | Tiempo Promedio | Datos Retornados | Estado |
+|----------|----------------|------------------|--------|
+| `GET /properties` | 1.5s | 7 propiedades | ✅ Funcional |
+| `GET /properties?includeTexts=all` | 0.7s | Con descripciones | ✅ Funcional |
+| `GET /properties/rooms` | - | Habitaciones | ⚠️ Error 500 |
 
 ---
 
