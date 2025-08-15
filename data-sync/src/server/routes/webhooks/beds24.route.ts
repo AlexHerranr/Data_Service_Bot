@@ -2,88 +2,86 @@ import { Router, Request, Response } from 'express';
 import { logger } from '../../../utils/logger.js';
 import { addWebhookJob } from '../../../infra/queues/queue.manager.js';
 import { metricsHelpers } from '../../../infra/metrics/prometheus.js';
+import { env } from '../../../config/env.js';
 
-// TODO: Implement HMAC verification
-function verifyHmac(req: Request, res: Response, next: Function) {
-  // Placeholder - implement real HMAC verification in production
+// Simple token verification for Beds24 webhooks
+function verifyBeds24Token(req: Request, res: Response, next: Function) {
+  const token = req.headers['x-beds24-token'] || req.headers['authorization']?.replace('Bearer ', '');
+  
+  if (!env.BEDS24_WEBHOOK_TOKEN) {
+    logger.warn('BEDS24_WEBHOOK_TOKEN not configured, skipping verification');
+    return next();
+  }
+  
+  if (token !== env.BEDS24_WEBHOOK_TOKEN) {
+    logger.warn({ 
+      providedToken: token ? `${String(token).substring(0, 10)}...` : 'none',
+      expectedExists: !!env.BEDS24_WEBHOOK_TOKEN 
+    }, 'Beds24 webhook invalid token');
+    
+    return res.status(401).json({ 
+      error: 'Invalid token',
+      received: false 
+    });
+  }
+  
   next();
 }
 
 export function registerBeds24Webhook(router: Router): void {
-  router.post('/webhooks/beds24', verifyHmac, async (req: Request, res: Response): Promise<void> => {
+  router.post('/webhooks/beds24', verifyBeds24Token, async (req: Request, res: Response): Promise<void> => {
     try {
-      const { booking, timeStamp } = req.body;
+      const payload = req.body;
       
-      // Validar estructura del webhook de Beds24
-      if (!booking || !booking.id) {
-        res.status(400).json({ 
-          error: 'Missing required fields: booking.id',
-          received: false
-        });
-        return;
-      }
-
-      // Extraer datos del formato de Beds24
-      const bookingId = String(booking.id);
-      const status = booking.status || 'unknown';
-      // Determinar acción basada en el estado y timestamps
-      let action: 'created' | 'modified' | 'cancelled' = 'created';
-      if (booking.cancelTime) {
-        action = 'cancelled';
-      } else if (booking.modifiedTime && booking.bookingTime !== booking.modifiedTime) {
-        action = 'modified';
-      }
-      
-      // Si status indica cancelación específicamente
-      if (status && (status.toLowerCase().includes('cancel') || status.toLowerCase().includes('deleted'))) {
-        action = 'cancelled';
-      }
-
-      // Respuesta inmediata para Beds24
-      res.status(200).json({ 
-        status: 'accepted', 
-        message: 'Webhook queued for processing',
+      // Respuesta inmediata 202 para Beds24 (no bloquear retries)
+      res.status(202).json({ 
+        received: true,
         timestamp: new Date().toISOString()
       });
+
+      // Básico: detectar ID y acción
+      const bookingId = payload.id || payload.booking?.id || payload.bookingId;
+      const action = payload.action || 'MODIFY'; // Default action
+      
+      if (!bookingId) {
+        logger.warn({ payload }, 'Beds24 webhook missing booking ID, skipping');
+        return;
+      }
 
       logger.info({ 
         type: 'beds24:webhook', 
         bookingId, 
-        action, 
-        status,
-        propertyId: booking.propertyId,
-        arrival: booking.arrival,
-        departure: booking.departure
+        action,
+        payload: payload
       }, 'Beds24 webhook received');
 
       // Record webhook metrics
-      metricsHelpers.recordWebhook('beds24', action);
+      metricsHelpers.recordWebhook('beds24', action.toLowerCase());
 
-      // Encolar job para procesamiento asíncrono (acepta todos los tipos)
+      // Encolar job - simple job ID
       const job = await addWebhookJob({
-        bookingId: String(bookingId),
-        action,
-        timestamp: new Date(),
-        priority: action === 'cancelled' ? 'high' : 'normal',
+        bookingId: bookingId,
+        action: action as any,
+        payload: {
+          id: bookingId,
+          action: action,
+          fullPayload: payload
+        }
       });
 
       logger.info({ 
         jobId: job.id,
         bookingId, 
-        action,
-        status
-      }, 'Beds24 webhook job queued successfully');
+        action
+      }, 'Beds24 webhook job queued');
       
     } catch (error: any) {
       logger.error({ 
         error: error.message,
         body: req.body
-      }, 'Webhook processing error');
+      }, 'Beds24 webhook error');
       
-      res.status(500).json({ 
-        error: 'Internal server error',
-        received: false
-      });
+      // Ya enviamos 202, no cambiar respuesta
     }
   });
 }

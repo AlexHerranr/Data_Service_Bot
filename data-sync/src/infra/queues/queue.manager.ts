@@ -52,15 +52,47 @@ export const beds24Worker = new Worker<JobData>(
     }, 'Processing job');
 
     try {
-      if (data.type === 'webhook') {
-        const webhookData = data as WebhookJob;
-        await syncSingleBooking(webhookData.bookingId);
+      if (data.type === 'webhook' || data.type === 'beds24-webhook') {
+        const webhookData = data as any; // Flexible para nuevos webhooks
+        const bookingId = webhookData.bookingId || webhookData.payload?.id;
+        const action = webhookData.action || webhookData.payload?.action || 'MODIFY';
+        
+        if (!bookingId) {
+          throw new Error('No booking ID found in webhook data');
+        }
+
+        logger.info({ 
+          jobId: job.id, 
+          bookingId,
+          action,
+          webhookType: data.type
+        }, 'Processing Beds24 webhook');
+
+        // Para MODIFY o CANCEL, fetch booking completo y actualizar BD
+        if (action === 'MODIFY' || action === 'CANCEL') {
+          await syncSingleBooking(bookingId);
+          
+          // Si es MODIFY, opcionalmente fetch messages
+          if (action === 'MODIFY') {
+            try {
+              // TODO: Implement message sync if needed
+              logger.debug({ bookingId }, 'Message sync could be implemented here');
+            } catch (msgError: any) {
+              logger.warn({ 
+                bookingId, 
+                error: msgError.message 
+              }, 'Message sync failed, continuing');
+            }
+          }
+        }
+
         metricsHelpers.recordJobComplete(data.type, startTime, 'success');
         logger.info({ 
           jobId: job.id, 
-          bookingId: webhookData.bookingId,
+          bookingId,
+          action,
           duration: Date.now() - startTime
-        }, 'Webhook job completed');
+        }, 'Beds24 webhook job completed');
         
       } else if (data.type === 'single') {
         const singleData = data as SingleSyncJob;
@@ -174,10 +206,16 @@ beds24Worker.on('error', (err) => {
 
 // Funciones para agregar jobs
 export async function addWebhookJob(
-  data: Omit<WebhookJob, 'type'>, 
+  data: Partial<WebhookJob> | any, 
   options?: QueueJobOptions
 ): Promise<Job> {
-  const jobData: WebhookJob = { type: 'webhook', ...data };
+  // Flexible webhook job data
+  const jobData = {
+    type: 'beds24-webhook',
+    timestamp: new Date(),
+    priority: 'high' as const,
+    ...data
+  };
   
   const job = await beds24Queue.add('webhook', jobData, {
     priority: 1, // Alta prioridad para webhooks
@@ -186,8 +224,8 @@ export async function addWebhookJob(
   
   logger.info({ 
     jobId: job.id,
-    bookingId: data.bookingId,
-    action: data.action
+    bookingId: jobData.bookingId || jobData.payload?.id,
+    action: jobData.action || jobData.payload?.action
   }, 'Webhook job queued');
   
   return job;
