@@ -12,7 +12,13 @@
       "Bash(npx tsc:*)",
       "Bash(npm run test-build:*)",
       "Bash(npx prisma generate:*)",
-      "Bash(npx prisma db pull:*)"
+      "Bash(npx prisma db pull:*)",
+      "Bash(npm run typecheck:*)",
+      "Bash(node:*)",
+      "Bash(npm install:*)",
+      "Bash(npm run build:*)",
+      "Bash(npm start)",
+      "Bash(winget install:*)"
     ],
     "defaultMode": "acceptEdits"
   }

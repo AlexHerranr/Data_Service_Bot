@@ -7,6 +7,11 @@ const envSchema = z.object({
     DATABASE_URL: z.string(),
     BEDS24_API_URL: z.string().url().default('https://api.beds24.com/v2'),
     BEDS24_TOKEN: z.string().min(1),
+    BEDS24_READ_REFRESH_TOKEN: z.string().optional(),
+    BEDS24_WRITE_REFRESH_TOKEN: z.string().optional(),
+    BEDS24_INVITE_CODE_READ: z.string().optional(),
+    BEDS24_INVITE_CODE_WRITE: z.string().optional(),
+    BEDS24_WEBHOOK_TOKEN: z.string().optional(),
     REDIS_URL: z.string().default('redis://localhost:6379'),
     REDIS_HOST: z.string().default('localhost'),
     REDIS_PORT: z.coerce.number().default(6379),
@@ -29,7 +34,9 @@ function parseEnv() {
             });
             console.error('\n📋 Required environment variables:');
             console.error('  - DATABASE_URL: PostgreSQL connection string');
-            console.error('  - BEDS24_TOKEN: Long life token from Beds24 API settings');
+            console.error('  - BEDS24_TOKEN: Long life token from Beds24 API settings (legacy)');
+            console.error('  - BEDS24_READ_REFRESH_TOKEN: Refresh token for read operations (optional)');
+            console.error('  - BEDS24_WRITE_REFRESH_TOKEN: Refresh token for write operations (optional)');
             console.error('  - BEDS24_API_URL: Beds24 API URL (optional, defaults to v2)');
             console.error('  - REDIS_URL: Redis connection string (optional, defaults to localhost)');
             process.exit(1);

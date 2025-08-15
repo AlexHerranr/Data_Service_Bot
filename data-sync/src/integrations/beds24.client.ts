@@ -194,46 +194,101 @@ export class Beds24Client {
   // ========== WRITE OPERATIONS (usar write token) ==========
 
   /**
-   * Actualizar reserva
+   * Crear o actualizar reservas (Beds24 usa solo POST para ambos)
+   * Si el objeto tiene "id" es update, si no lo tiene es create
+   * 
+   * ESTRATEGIA SIMPLIFICADA: Refresh directo sin Redis para máxima compatibilidad
    */
-  async updateBooking(bookingId: string, updateData: any): Promise<any> {
+  async upsertBooking(bookingData: any[] | any): Promise<any> {
     try {
-      logger.info({ bookingId, updateData }, 'Updating booking');
+      // Ensure bookingData is an array as expected by Beds24 API
+      const bookingsArray = Array.isArray(bookingData) ? bookingData : [bookingData];
       
-      const response = await this.api.patch(`/bookings/${bookingId}`, updateData, {
-        requireWrite: true
-      } as any);
+      const createCount = bookingsArray.filter(b => !b.id).length;
+      const updateCount = bookingsArray.filter(b => b.id).length;
+      
+      logger.info({ 
+        bookings: bookingsArray.length,
+        creates: createCount,
+        updates: updateCount 
+      }, 'Upserting booking(s) via POST /bookings');
+
+      // ESTRATEGIA SIMPLIFICADA: Refresh directo sin cache Redis
+      // Ideal para operaciones WRITE infrecuentes (<1/min)
+      if (!env.BEDS24_WRITE_REFRESH_TOKEN) {
+        throw new Error('BEDS24_WRITE_REFRESH_TOKEN not configured for write operations');
+      }
+
+      logger.debug('Refreshing access token for write operation');
+      const refreshResponse = await axios.get(`${env.BEDS24_API_URL}/authentication/token`, {
+        headers: { 'refreshToken': env.BEDS24_WRITE_REFRESH_TOKEN }
+      });
+      const accessToken = refreshResponse.data.token;
+      
+      // POST directo con access token fresco
+      const response = await axios.post(`${env.BEDS24_API_URL}/bookings`, bookingsArray, {
+        headers: { 'token': accessToken },
+        timeout: 15000
+      });
+      
+      logger.info({ 
+        bookings: bookingsArray.length,
+        creates: createCount,
+        updates: updateCount,
+        responseCount: response.data.length
+      }, 'Booking upsert completed successfully');
       
       return response.data;
     } catch (error: any) {
+      const bookingsArray = Array.isArray(bookingData) ? bookingData : [bookingData];
       logger.error({ 
         error: error.message, 
-        bookingId, 
-        updateData 
-      }, 'Failed to update booking');
+        bookingData: bookingsArray?.length ? `${bookingsArray.length} bookings` : 'invalid data'
+      }, 'Failed to upsert booking');
       throw error;
     }
   }
 
   /**
-   * Crear nueva reserva
+   * Método simplificado para testing local sin Redis
    */
-  async createBooking(bookingData: any): Promise<any> {
+  async upsertBookingSimple(bookingData: any[] | any): Promise<any> {
     try {
-      logger.info({ bookingData }, 'Creating new booking');
+      const bookingsArray = Array.isArray(bookingData) ? bookingData : [bookingData];
       
-      const response = await this.api.post('/bookings', bookingData, {
-        requireWrite: true
-      } as any);
+      logger.info({ bookings: bookingsArray.length }, 'Testing upsert booking (local)');
+      
+      // Refresh token directo para testing local
+      const refreshResponse = await axios.get(`${env.BEDS24_API_URL}/authentication/token`, {
+        headers: { 'refreshToken': env.BEDS24_WRITE_REFRESH_TOKEN }
+      });
+      const accessToken = refreshResponse.data.token;
+
+      const response = await axios.post(`${env.BEDS24_API_URL}/bookings`, bookingsArray, {
+        headers: { 'token': accessToken }
+      });
       
       return response.data;
     } catch (error: any) {
-      logger.error({ 
-        error: error.message, 
-        bookingData 
-      }, 'Failed to create booking');
+      logger.error({ error: error.message }, 'Failed to upsert booking (simple)');
       throw error;
     }
+  }
+
+  /**
+   * Crear nueva reserva (legacy method - wrapper para upsertBooking)
+   */
+  async createBooking(bookingData: any[] | any): Promise<any> {
+    return this.upsertBooking(bookingData);
+  }
+
+  /**
+   * Actualizar reserva (legacy method - wrapper para upsertBooking)
+   */
+  async updateBooking(bookingId: string, updateData: any): Promise<any> {
+    // Agregar el ID al updateData para que sea un update
+    const bookingWithId = { id: bookingId, ...updateData };
+    return this.upsertBooking([bookingWithId]);
   }
 
   /**
@@ -276,6 +331,43 @@ export class Beds24Client {
         propertyId, 
         inventoryData 
       }, 'Failed to update inventory');
+      throw error;
+    }
+  }
+
+  /**
+   * Obtener reviews de Booking.com
+   */
+  async getBookingReviews(): Promise<any> {
+    try {
+      const response = await this.api.get('/channels/booking/reviews', {
+        requireWrite: false
+      } as any);
+      
+      return response.data;
+    } catch (error: any) {
+      logger.error({ error: error.message }, 'Failed to get Booking.com reviews');
+      throw error;
+    }
+  }
+
+  /**
+   * Realizar acciones en Booking.com (reportNoShow, etc.)
+   */
+  async performBookingActions(actions: any[]): Promise<any> {
+    try {
+      logger.info({ actions }, 'Performing Booking.com actions');
+      
+      const response = await this.api.post('/channels/booking', actions, {
+        requireWrite: true
+      } as any);
+      
+      return response.data;
+    } catch (error: any) {
+      logger.error({ 
+        error: error.message, 
+        actions 
+      }, 'Failed to perform Booking.com actions');
       throw error;
     }
   }

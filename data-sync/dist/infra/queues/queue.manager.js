@@ -27,15 +27,40 @@ export const beds24Worker = new Worker('beds24-sync', async (job) => {
         maxAttempts: job.opts.attempts || 3
     }, 'Processing job');
     try {
-        if (data.type === 'webhook') {
+        if (data.type === 'webhook' || data.type === 'beds24-webhook') {
             const webhookData = data;
-            await syncSingleBooking(webhookData.bookingId);
+            const bookingId = webhookData.bookingId || webhookData.payload?.id;
+            const action = webhookData.action || webhookData.payload?.action || 'MODIFY';
+            if (!bookingId) {
+                throw new Error('No booking ID found in webhook data');
+            }
+            logger.info({
+                jobId: job.id,
+                bookingId,
+                action,
+                webhookType: data.type
+            }, 'Processing Beds24 webhook');
+            if (action === 'MODIFY' || action === 'CANCEL') {
+                await syncSingleBooking(bookingId);
+                if (action === 'MODIFY') {
+                    try {
+                        logger.debug({ bookingId }, 'Message sync could be implemented here');
+                    }
+                    catch (msgError) {
+                        logger.warn({
+                            bookingId,
+                            error: msgError.message
+                        }, 'Message sync failed, continuing');
+                    }
+                }
+            }
             metricsHelpers.recordJobComplete(data.type, startTime, 'success');
             logger.info({
                 jobId: job.id,
-                bookingId: webhookData.bookingId,
+                bookingId,
+                action,
                 duration: Date.now() - startTime
-            }, 'Webhook job completed');
+            }, 'Beds24 webhook job completed');
         }
         else if (data.type === 'single') {
             const singleData = data;
@@ -136,15 +161,20 @@ beds24Worker.on('error', (err) => {
     logger.error({ error: err.message }, 'Worker error');
 });
 export async function addWebhookJob(data, options) {
-    const jobData = { type: 'webhook', ...data };
+    const jobData = {
+        type: 'beds24-webhook',
+        timestamp: new Date(),
+        priority: 'high',
+        ...data
+    };
     const job = await beds24Queue.add('webhook', jobData, {
         priority: 1,
         ...options,
     });
     logger.info({
         jobId: job.id,
-        bookingId: data.bookingId,
-        action: data.action
+        bookingId: jobData.bookingId || jobData.payload?.id,
+        action: jobData.action || jobData.payload?.action
     }, 'Webhook job queued');
     return job;
 }
