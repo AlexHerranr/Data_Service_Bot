@@ -7,10 +7,11 @@
 Los endpoints CRUD permiten **gestión completa** de la base de datos compartida entre Bot WhatsApp y Bot Data Service. Ofrecen acceso directo para testing, debugging y administración de datos.
 
 ### **Tablas Gestionadas**
-- ✅ **ClientView** - Clientes WhatsApp (phoneNumber como PK)
-- ✅ **Booking** - Reservas Beds24 (id como PK)  
-- ✅ **Leads** - Prospectos/Leads (id como PK)
-- ✅ **hotel_apartments** - Apartamentos (id como PK)
+- ✅ **ClientView** - Clientes WhatsApp (phoneNumber como PK) - **2 registros**
+- ✅ **Booking** - Reservas Beds24 (id como PK) - **1,191 registros**
+- ✅ **Leads** - Prospectos/Leads con CRM avanzado (id como PK) - **19 registros**
+- ✅ **hotel_apartments** - Apartamentos (id como PK) - **7 registros**
+- ✅ **IA_CMR_Clientes** - Clientes IA/CRM (phoneNumber como PK) - **0 registros**
 
 ---
 
@@ -27,10 +28,11 @@ ClientView                              findMany()
 ### **Mapeo Nombres**
 ```typescript
 // API Endpoint → Modelo Prisma
-'ClientView' → 'clientView'      // phoneNumber como PK
-'Booking' → 'booking'           // id como PK  
-'Leads' → 'leads'              // id como PK
+'ClientView' → 'clientView'           // phoneNumber como PK
+'Booking' → 'booking'                // id como PK  
+'Leads' → 'leads'                   // id como PK (CRM avanzado)
 'hotel_apartments' → 'hotel_apartments'  // id como PK
+'IA_CMR_Clientes' → 'iA_CMR_Clientes'   // phoneNumber como PK
 ```
 
 ---
@@ -153,14 +155,14 @@ curl -X DELETE "https://dataservicebot-production.up.railway.app/api/tables/Lead
 
 ### **1. Validación de Tablas**
 ```typescript
-const VALID_TABLES = ['ClientView', 'Booking', 'Leads', 'hotel_apartments'];
+const VALID_TABLES = ['ClientView', 'Booking', 'Leads', 'hotel_apartments', 'IA_CMR_Clientes'];
 
 // Request inválido
 GET /api/tables/InvalidTable
 // Response: 400 Bad Request
 {
   "error": "Invalid table name",
-  "validTables": ["ClientView", "Booking", "Leads", "hotel_apartments"]
+  "validTables": ["ClientView", "Booking", "Leads", "hotel_apartments", "IA_CMR_Clientes"]
 }
 ```
 
@@ -260,13 +262,33 @@ curl -X POST "https://dataservicebot-production.up.railway.app/api/tables/Leads"
 ```
 
 ### **Checklist de Pruebas**
-- [ ] ✅ GET lista registros con paginación
-- [ ] ✅ GET por ID encuentra registro específico  
-- [ ] ✅ POST crea nuevo registro
-- [ ] ✅ PATCH actualiza campos existentes
-- [ ] 🚫 DELETE bloqueado en producción
-- [ ] ✅ Validación rechaza tablas inválidas
-- [ ] ✅ Límites paginación respetados
+- [x] ✅ GET lista registros con paginación
+- [x] ✅ GET por ID encuentra registro específico  
+- [x] ✅ POST crea nuevo registro
+- [x] ✅ PATCH actualiza campos existentes
+- [x] 🚫 DELETE bloqueado en producción
+- [x] ✅ Validación rechaza tablas inválidas
+- [x] ✅ Límites paginación respetados
+- [x] ✅ Filtros dinámicos funcionando (ej: `?status=confirmed`)
+
+### **✅ Resultados de Testing en Producción**
+
+**Fecha de Pruebas**: 14 Agosto 2025  
+**Environment**: dataservicebot-production.up.railway.app
+
+| Tabla | Estado | Registros | Ejemplo Testing |
+|-------|--------|-----------|----------------|
+| **ClientView** | ✅ | 2 | `GET /api/tables/ClientView/573003913251` |
+| **Booking** | ✅ | 1,191 | `GET /api/tables/Booking?status=confirmed` (562 resultados) |
+| **Leads** | ✅ | 19 | CRM avanzado con `leadType`, `estimatedValue`, `assignedTo` |
+| **hotel_apartments** | ✅ | 7 | Inventario completo de propiedades |
+| **IA_CMR_Clientes** | ✅ | 0 | Tabla funcional, lista para datos IA |
+
+**Protecciones Verificadas**:
+- ✅ `DELETE /api/tables/Leads/111` → `403 Forbidden` (bloqueado en producción)
+- ✅ `GET /api/tables/InvalidTable` → `400 Bad Request` con lista de tablas válidas
+- ✅ Filtros: `?status=confirmed&limit=1` funciona correctamente
+- ✅ Paginación: `total: 562` de `1191` reservas confirmadas
 
 ### **Logging para Debug**
 ```typescript
@@ -298,7 +320,14 @@ logger.warn({ tableName, id, action: 'DELETE_BLOCKED' }, '🚫 DELETE blocked');
 ### **4. Leads Management**
 - **Crear lead manualmente**: `POST /api/tables/Leads`
 - **Actualizar prioridad**: `PATCH /api/tables/Leads/{id}`
+- **CRM avanzado**: Ver campos `leadType`, `estimatedValue`, `assignedTo`, `nextFollowUp`
 - **Convertir a reserva**: Lógica business custom
+
+### **5. IA/CRM Automatizado**
+- **Gestión IA_CMR_Clientes**: `GET /api/tables/IA_CMR_Clientes`
+- **Próxima acción**: Campo `proximaAccion` y `fechaProximaAccion`
+- **Priorización**: Campo `prioridad` para orden de contacto
+- **Estado perfil**: Campo `profileStatus` para seguimiento
 
 ---
 
