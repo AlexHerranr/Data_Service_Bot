@@ -78,6 +78,7 @@ ClientView     Reservas/Beds24
 - 📚 **[Índice Documentación](docs/INDICE_DOCUMENTACION.md)** - Todas las guías
 
 ### Sistema
+- 🗄️ **[BD Management CRUD](docs/GUIA_BD_MANAGEMENT.md)** - ✅ **Endpoints CRUD completos**
 - 🏨 **[Guía Tabla Hoteles](docs/GUIA_TABLA_HOTELES.md)** - Mapeo de propiedades
 - 📊 **[BD Status Automático](docs/RESUMEN_BDSTATUS_AUTOMATICO.md)** - Sistema de estados
 - 🗄️ **[Estrategia BD Compartida](ESTRATEGIA_BD_COMPARTIDA.md)** - Arquitectura DB

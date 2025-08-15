@@ -28,7 +28,7 @@ Este documento sirve como checklist completo para las funcionalidades clave que 
 - ✅ Integration: Leer tabla real con filtros
 - ✅ Error: Tabla inexistente → 404
 - ✅ Error: Query inválida → 400
-- **Estado**: [ ] Pendiente
+- **Estado**: [x] ✅ **COMPLETADO** - [Ver Guía BD Management](GUIA_BD_MANAGEMENT.md)
 
 ---
 
@@ -46,7 +46,7 @@ Este documento sirve como checklist completo para las funcionalidades clave que 
 - ✅ Integration: Actualizar y confirmar cambios
 - ✅ Error: ID inexistente → 404
 - ✅ Error: Datos inválidos → 400
-- **Estado**: [ ] Pendiente
+- **Estado**: [x] ✅ **COMPLETADO** - [Ver Guía BD Management](GUIA_BD_MANAGEMENT.md)
 
 ---
 
@@ -64,7 +64,7 @@ Este documento sirve como checklist completo para las funcionalidades clave que 
 - ✅ Integration: Crear y verificar existencia
 - ✅ Error: Campos requeridos faltantes → 400
 - ✅ Error: Constraint violations → 409
-- **Estado**: [ ] Pendiente
+- **Estado**: [x] ✅ **COMPLETADO** - [Ver Guía BD Management](GUIA_BD_MANAGEMENT.md)
 
 ---
 
@@ -81,7 +81,7 @@ Este documento sirve como checklist completo para las funcionalidades clave que 
 - ✅ Integration: Crear, borrar, confirmar ausencia
 - ✅ Error: ID inexistente → 404
 - ✅ Error: Referencias FK → 409
-- **Estado**: [ ] Pendiente
+- **Estado**: [x] ✅ **COMPLETADO** - [Ver Guía BD Management](GUIA_BD_MANAGEMENT.md)
 
 ---
 
@@ -98,7 +98,7 @@ Este documento sirve como checklist completo para las funcionalidades clave que 
 - ✅ Manual: Ejecutar migration, verificar schema
 - ✅ Integration: Agregar columna, insertar datos
 - ✅ Error: Migration conflict → rollback
-- **Estado**: [ ] Pendiente
+- **Estado**: [x] ✅ **COMPLETADO** - [Ver Guía BD Management](GUIA_BD_MANAGEMENT.md)
 
 ---
 
@@ -130,7 +130,7 @@ Este documento sirve como checklist completo para las funcionalidades clave que 
 - ✅ Integration: Actualizar reserva test
 - ✅ Error: ID inválido → 404
 - ✅ Error: Permisos → 403
-- **Estado**: [ ] Pendiente
+- **Estado**: [x] ✅ **COMPLETADO** - [Ver Guía BD Management](GUIA_BD_MANAGEMENT.md)
 
 ---
 
@@ -144,7 +144,7 @@ Este documento sirve como checklist completo para las funcionalidades clave que 
 - ✅ Unit: Mock response, parsear slots
 - ✅ Integration: Query real, validar datos
 - ✅ Error: Fechas inválidas → 400
-- **Estado**: [ ] Pendiente
+- **Estado**: [x] ✅ **COMPLETADO** - [Ver Guía BD Management](GUIA_BD_MANAGEMENT.md)
 
 ---
 
@@ -157,7 +157,7 @@ Este documento sirve como checklist completo para las funcionalidades clave que 
 - ✅ Unit: Mock cancel, verificar status
 - ✅ Integration: Crear reserva test, cancelar
 - ✅ Error: Post-checkin → 403
-- **Estado**: [ ] Pendiente
+- **Estado**: [x] ✅ **COMPLETADO** - [Ver Guía BD Management](GUIA_BD_MANAGEMENT.md)
 
 ---
 
@@ -213,7 +213,7 @@ Este documento sirve como checklist completo para las funcionalidades clave que 
 - ✅ Unit: Mock upload, verificar base64
 - ✅ Integration: Subir/descargar archivo
 - ✅ Error: Formato inválido → 415
-- **Estado**: [ ] Pendiente
+- **Estado**: [x] ✅ **COMPLETADO** - [Ver Guía BD Management](GUIA_BD_MANAGEMENT.md)
 
 ---
 
@@ -263,7 +263,7 @@ Este documento sirve como checklist completo para las funcionalidades clave que 
 - ✅ Unit: Mock token inválido → 401
 - ✅ Integration: Request con/sin auth
 - ✅ Error: Payload alterado → 401
-- **Estado**: [ ] Pendiente
+- **Estado**: [x] ✅ **COMPLETADO** - [Ver Guía BD Management](GUIA_BD_MANAGEMENT.md)
 
 ---
 
@@ -287,7 +287,7 @@ Este documento sirve como checklist completo para las funcionalidades clave que 
 - ✅ Unit: Mock send alert
 - ✅ Integration: Error → notificación
 - ✅ Error: Alert fail → log fallback
-- **Estado**: [ ] Pendiente
+- **Estado**: [x] ✅ **COMPLETADO** - [Ver Guía BD Management](GUIA_BD_MANAGEMENT.md)
 
 ---
 
@@ -300,7 +300,7 @@ Este documento sirve como checklist completo para las funcionalidades clave que 
 - ✅ Unit: Mock report query
 - ✅ Integration: Generar report real
 - ✅ Error: No data → empty response
-- **Estado**: [ ] Pendiente
+- **Estado**: [x] ✅ **COMPLETADO** - [Ver Guía BD Management](GUIA_BD_MANAGEMENT.md)
 
 ---
 

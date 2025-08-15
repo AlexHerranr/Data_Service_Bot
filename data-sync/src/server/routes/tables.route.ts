@@ -9,7 +9,7 @@ type ValidTable = typeof VALID_TABLES[number];
 const TABLE_TO_PRISMA_MODEL: Record<ValidTable, string> = {
   'ClientView': 'clientView',
   'Booking': 'booking', 
-  'Leads': 'leads',
+  'Leads': 'lead',  // Singular
   'hotel_apartments': 'hotel_apartments'
 };
 

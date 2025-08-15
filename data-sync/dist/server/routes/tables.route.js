@@ -4,7 +4,7 @@ const VALID_TABLES = ['ClientView', 'Booking', 'Leads', 'hotel_apartments'];
 const TABLE_TO_PRISMA_MODEL = {
     'ClientView': 'clientView',
     'Booking': 'booking',
-    'Leads': 'leads',
+    'Leads': 'lead',
     'hotel_apartments': 'hotel_apartments'
 };
 function isValidTable(table) {
