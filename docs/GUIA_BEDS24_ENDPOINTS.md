@@ -432,6 +432,137 @@ if (newBooking.data[0]) {
 
 ---
 
+## 🪝 **Webhooks para Sync Automático**
+
+### **Endpoint Webhook**
+
+```bash
+POST /api/webhooks/beds24
+```
+
+**Autenticación**: Header `x-beds24-token`
+
+**Descripción**: Recibe notificaciones automáticas de Beds24 cuando ocurren cambios en reservas. Procesa updates de forma asíncrona para mantener la BD sincronizada en tiempo real.
+
+### **Configuración en Beds24**
+
+1. **Panel Beds24**: Settings > API > Webhooks
+2. **URL**: `https://dataservicebot-production.up.railway.app/api/webhooks/beds24`
+3. **Token**: Configurar en header `x-beds24-token: beds24_webhook_secure_token_2025`
+4. **Eventos**: Seleccionar booking events (create, modify, cancel)
+
+### **Payload Formato**
+
+```json
+{
+  "booking": {
+    "id": "74273621"
+  },
+  "action": "MODIFY",
+  "timestamp": "2025-08-15T01:30:00Z"
+}
+```
+
+### **Respuesta del Webhook**
+
+```json
+{
+  "received": true,
+  "timestamp": "2025-08-15T01:30:00.123Z"
+}
+```
+
+**Status Code**: `202 Accepted` (respuesta inmediata para no bloquear retries de Beds24)
+
+### **Procesamiento Asíncrono**
+
+#### **1. Webhook Recibido**
+- ✅ Validación de token
+- ✅ Respuesta 202 inmediata
+- ✅ Job encolado en BullMQ
+
+#### **2. Job Processing**
+- ✅ Fetch booking completo desde Beds24 API
+- ✅ Upsert en tabla `Booking` 
+- ✅ Logs detallados + métricas
+- ✅ Manejo de errores con DLQ
+
+#### **3. Actions Soportadas**
+- `MODIFY`: Actualiza datos del booking
+- `CANCEL`: Marca como cancelado
+- `CREATE`: Inserta nuevo booking
+
+### **Monitoreo**
+
+#### **Queue Stats**
+```bash
+GET /api/admin/queues/stats
+```
+
+**Respuesta**:
+```json
+{
+  "queues": {
+    "beds24-sync": {
+      "waiting": 0,
+      "active": 0,
+      "completed": 4,
+      "failed": 0
+    }
+  }
+}
+```
+
+#### **Logs en Tiempo Real**
+- Railway Dashboard > Logs
+- Filtrar: `beds24:webhook` OR `Processing Beds24 webhook`
+
+### **Testing del Webhook**
+
+#### **Simulación Manual**
+```bash
+curl -X POST "https://dataservicebot-production.up.railway.app/api/webhooks/beds24" \
+  -H "x-beds24-token: beds24_webhook_secure_token_2025" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "booking": {
+      "id": "74273621"
+    },
+    "action": "MODIFY"
+  }'
+```
+
+**Verificación**:
+1. ✅ Response `202 {"received": true}`
+2. ✅ Check queue stats: `completed +1`
+3. ✅ Verificar BD: tabla `Booking` actualizada
+
+#### **Testing End-to-End**
+1. **Cambiar reserva** en Beds24 Panel
+2. **Webhook automático** → tu endpoint
+3. **Job procesado** → BD actualizada
+4. **Tiempo total**: <2 segundos
+
+### **Beneficios del Sync Automático**
+
+#### **Eficiencia**
+- ⚡ **Tiempo real**: Updates instantáneos sin polling
+- 🚀 **Performance**: <500ms webhook response
+- 📈 **Escalable**: Jobs asíncronos, no bloquea Beds24
+
+#### **Confiabilidad**
+- 🔄 **Retry automático**: BullMQ con backoff exponencial
+- 🛡️ **Dead Letter Queue**: Capturas jobs fallidos
+- 📊 **Métricas**: Prometheus monitoring
+
+#### **Casos de Uso**
+- 📱 **Notificaciones WhatsApp**: Avisar cambios importantes
+- 📧 **Email automático**: Confirmaciones, cancelaciones
+- 📊 **Analytics**: Tracking de modificaciones en tiempo real
+- 🤖 **Automatización**: Triggers para workflows
+
+---
+
 ## 🛠️ **Troubleshooting**
 
 ### **Errores Comunes**
@@ -503,22 +634,26 @@ GET /api/health
 | `GET /properties` | ✅ Funcional | <1s | 7 propiedades |
 | `GET /availability` | ✅ Implementado | <1s | Calculado |
 | `PATCH /bookings/:id` | ⚠️ Requiere Redis | - | Token cache |
+| `POST /webhooks/beds24` | ✅ Funcional | <500ms | Sync automático |
 
 ### 📈 **Métricas Reales**
 
-- **Total Reservas**: 69 activas
+- **Total Reservas**: 1,191 en BD (sync automático)
 - **Canales**: Airbnb, Booking.com, Direct
 - **Propiedades**: 7 configuradas
 - **Response Time**: <500ms promedio
+- **Webhook Performance**: <500ms → 202 response
+- **Queue Processing**: 4 jobs completados, 0 failed
 - **Uptime**: 99.9% en Railway
 
 ### 🎯 **Próximos Pasos**
 
-1. ✅ **Autenticación**: Completado
+1. ✅ **Autenticación**: Completado (dual tokens)
 2. ✅ **READ Operations**: Completado  
 3. ⚠️ **WRITE Operations**: Requiere Redis en producción
-4. 🔄 **Webhooks**: Pendiente implementación
-5. 📊 **Monitoring**: Configurado
+4. ✅ **Webhooks**: Completado (sync automático)
+5. ✅ **Monitoring**: Configurado (métricas + logs)
+6. 🔄 **Integración WhatsApp**: Siguiente fase
 
 ---
 
