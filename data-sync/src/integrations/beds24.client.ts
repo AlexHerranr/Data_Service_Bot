@@ -1,16 +1,9 @@
 import axios, { AxiosInstance } from 'axios';
 import { logger } from '../utils/logger.js';
 import { env } from '../config/env.js';
-import { beds24Auth } from './beds24.auth.js';
-import { redis } from '../infra/redis/redis.client.js';
-
-interface Beds24RequestConfig {
-  requireWrite?: boolean;
-}
 
 export class Beds24Client {
   private api: AxiosInstance;
-  private readonly CACHE_PREFIX = 'beds24:tokens:';
   
   constructor() {
     this.api = axios.create({
@@ -18,98 +11,16 @@ export class Beds24Client {
       timeout: 15000,
     });
 
-    // Interceptor para manejo automático de tokens
+    // Interceptor simplificado solo para READ operations
     this.api.interceptors.request.use(async (config) => {
-      const requireWrite = (config as any).requireWrite || false;
-      const token = await this.getValidToken(requireWrite);
-      
+      // Solo para operaciones READ, usar long-life token
       config.headers = config.headers || {};
-      config.headers['token'] = token;
-      
+      config.headers['token'] = env.BEDS24_TOKEN;
       return config;
     });
   }
 
-  /**
-   * Obtener token válido (read o write según necesidad)
-   */
-  private async getValidToken(requireWrite = false): Promise<string> {
-    try {
-      if (requireWrite) {
-        // Para operaciones WRITE, usar refresh token system
-        const refreshToken = env.BEDS24_WRITE_REFRESH_TOKEN;
-        
-        if (!refreshToken) {
-          throw new Error('No write refresh token available for write operations');
-        }
-
-        const tokenType = 'write';
-        const cacheKey = `${this.CACHE_PREFIX}${tokenType}`;
-        const expiresKey = `${this.CACHE_PREFIX}${tokenType}:expires`;
-
-        // Verificar cache
-        const cachedToken = await redis.get(cacheKey);
-        const expiresAtStr = await redis.get(expiresKey);
-        
-        if (cachedToken && expiresAtStr && Date.now() < parseInt(expiresAtStr)) {
-          logger.debug({ tokenType }, 'Using cached Beds24 write token');
-          return cachedToken;
-        }
-
-        // Refresh access token
-        logger.info({ tokenType }, 'Refreshing Beds24 write token');
-        const tokenResponse = await beds24Auth.refreshToken(refreshToken);
-        
-        // Cache con buffer de 1 minuto
-        const tokenExpiresAt = Date.now() + (tokenResponse.expiresIn * 1000) - (60 * 1000);
-        await redis.setex(cacheKey, tokenResponse.expiresIn - 60, tokenResponse.token);
-        await redis.set(expiresKey, tokenExpiresAt.toString());
-
-        logger.info({ 
-          tokenType, 
-          expiresIn: tokenResponse.expiresIn 
-        }, 'Beds24 write token refreshed and cached');
-
-        return tokenResponse.token;
-      } else {
-        // Para operaciones READ, usar long life token (legacy)
-        logger.debug('Using long life token for read operations');
-        return env.BEDS24_TOKEN;
-      }
-    } catch (error: any) {
-      logger.error({ 
-        error: error.message, 
-        requireWrite 
-      }, 'Failed to get valid Beds24 token');
-      throw error;
-    }
-  }
-
-  /**
-   * Verificar scopes del token actual
-   */
-  async verifyTokenScopes(requireWrite = false): Promise<{ valid: boolean; scopes: string[] }> {
-    try {
-      const token = await this.getValidToken(requireWrite);
-      const details = await beds24Auth.getTokenDetails(token);
-      
-      const requiredScopes = requireWrite 
-        ? ['write:bookings', 'all:bookings'] 
-        : ['read:bookings'];
-      
-      const hasRequiredScopes = requiredScopes.some(scope => 
-        details.token.scopes.includes(scope)
-      );
-
-      return {
-        valid: details.validToken && hasRequiredScopes,
-        scopes: details.token.scopes
-      };
-    } catch (error: any) {
-      logger.error({ error: error.message }, 'Failed to verify token scopes');
-      return { valid: false, scopes: [] };
-    }
-  }
+  // Métodos simplificados - sin Redis, sin cache
 
   // ========== READ OPERATIONS (usar read token) ==========
 
@@ -249,31 +160,7 @@ export class Beds24Client {
     }
   }
 
-  /**
-   * Método simplificado para testing local sin Redis
-   */
-  async upsertBookingSimple(bookingData: any[] | any): Promise<any> {
-    try {
-      const bookingsArray = Array.isArray(bookingData) ? bookingData : [bookingData];
-      
-      logger.info({ bookings: bookingsArray.length }, 'Testing upsert booking (local)');
-      
-      // Refresh token directo para testing local
-      const refreshResponse = await axios.get(`${env.BEDS24_API_URL}/authentication/token`, {
-        headers: { 'refreshToken': env.BEDS24_WRITE_REFRESH_TOKEN }
-      });
-      const accessToken = refreshResponse.data.token;
-
-      const response = await axios.post(`${env.BEDS24_API_URL}/bookings`, bookingsArray, {
-        headers: { 'token': accessToken }
-      });
-      
-      return response.data;
-    } catch (error: any) {
-      logger.error({ error: error.message }, 'Failed to upsert booking (simple)');
-      throw error;
-    }
-  }
+  // upsertBookingSimple removido - ahora upsertBooking es simplificado
 
   /**
    * Crear nueva reserva (legacy method - wrapper para upsertBooking)
