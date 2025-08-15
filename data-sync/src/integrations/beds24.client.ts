@@ -1,6 +1,7 @@
 import axios, { AxiosInstance } from 'axios';
 import { logger } from '../utils/logger.js';
 import { env } from '../config/env.js';
+import { redis } from '../infra/redis/redis.client.js';
 
 export class Beds24Client {
   private api: AxiosInstance;
@@ -23,8 +24,10 @@ export class Beds24Client {
   }
 
   /**
-   * Inicializar cliente con auth desde Railway IP
-   * Se ejecuta una vez al startup de la aplicación
+   * Inicializar cliente con auth persistente
+   * 1. Intentar cargar refresh token de Redis
+   * 2. Si no existe y invite está habilitado, generar nuevo
+   * 3. Guardar en Redis por 25 días
    */
   async initialize(): Promise<void> {
     if (this.isInitialized) {
@@ -33,13 +36,37 @@ export class Beds24Client {
     }
 
     try {
+      const redisKey = 'beds24:write:refresh_token';
+      
+      // PASO 1: Intentar cargar token de Redis
+      const cachedToken = await redis.get(redisKey);
+      
+      if (cachedToken) {
+        logger.info('🔄 Using cached Beds24 refresh token from Redis');
+        this.writeRefreshToken = cachedToken;
+        this.isInitialized = true;
+        
+        logger.info({
+          tokenLength: this.writeRefreshToken?.length,
+          source: 'redis-cache'
+        }, '✅ Beds24 write token loaded from cache');
+        return;
+      }
+
+      // PASO 2: Token no existe, verificar si podemos generar uno nuevo
+      const inviteEnabled = env.BEDS24_INVITE_ENABLED === 'true';
+      
+      if (!inviteEnabled) {
+        throw new Error('No cached refresh token and invite generation disabled. Set BEDS24_INVITE_ENABLED=true or provide valid cached token.');
+      }
+
       if (!env.BEDS24_INVITE_CODE_WRITE) {
         throw new Error('BEDS24_INVITE_CODE_WRITE not configured for write operations');
       }
 
-      logger.info('🚀 Initializing Beds24 write token from Railway IP');
+      logger.info('🚀 Generating new Beds24 refresh token from Railway IP');
       
-      // Generar refresh token usando invite code desde IP actual de Railway
+      // PASO 3: Generar refresh token usando invite code desde IP actual de Railway
       const setupResponse = await axios.get(`${env.BEDS24_API_URL}/authentication/setup`, {
         headers: { 
           'code': env.BEDS24_INVITE_CODE_WRITE,
@@ -48,12 +75,22 @@ export class Beds24Client {
       });
 
       this.writeRefreshToken = setupResponse.data.refreshToken;
+      
+      // PASO 4: Guardar en Redis por 25 días (renovar antes de los 30)
+      const ttlDays = 25;
+      const ttlSeconds = ttlDays * 24 * 60 * 60;
+      if (this.writeRefreshToken) {
+        await redis.setex(redisKey, ttlSeconds, this.writeRefreshToken);
+      }
+      
       this.isInitialized = true;
 
       logger.info({
         tokenLength: this.writeRefreshToken?.length,
-        expiresIn: setupResponse.data.expiresIn
-      }, '✅ Beds24 write token initialized successfully from Railway IP');
+        expiresIn: setupResponse.data.expiresIn,
+        cachedForDays: ttlDays,
+        source: 'new-generation'
+      }, '✅ Beds24 write token generated and cached successfully');
 
     } catch (error: any) {
       logger.error({ 

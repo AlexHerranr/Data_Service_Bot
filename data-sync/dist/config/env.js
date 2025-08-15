@@ -11,6 +11,7 @@ const envSchema = z.object({
     BEDS24_WRITE_REFRESH_TOKEN: z.string().optional(),
     BEDS24_INVITE_CODE_READ: z.string().optional(),
     BEDS24_INVITE_CODE_WRITE: z.string().optional(),
+    BEDS24_INVITE_ENABLED: z.string().optional().default('false'),
     BEDS24_WEBHOOK_TOKEN: z.string().optional(),
     REDIS_URL: z.string().default('redis://localhost:6379'),
     REDIS_HOST: z.string().default('localhost'),

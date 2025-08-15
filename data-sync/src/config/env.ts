@@ -16,6 +16,7 @@ const envSchema = z.object({
   BEDS24_WRITE_REFRESH_TOKEN: z.string().optional(), // Write/Create operations
   BEDS24_INVITE_CODE_READ: z.string().optional(), // For initial setup
   BEDS24_INVITE_CODE_WRITE: z.string().optional(), // For initial setup
+  BEDS24_INVITE_ENABLED: z.string().optional().default('false'), // Enable auto-generation from invite code
   BEDS24_WEBHOOK_TOKEN: z.string().optional(), // For webhook verification
   
   // Redis configuration
