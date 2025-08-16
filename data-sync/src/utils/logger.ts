@@ -12,16 +12,18 @@ const loggerOptions: pino.LoggerOptions = {
   },
   base: {}, // Minimal base
   redact: ['payload.*.token', 'payload.*.password', '*.token', '*.password'], // Redact sensitive
-  transport: {
-    target: 'pino-pretty',
-    options: {
-      colorize: !isProduction, // Color solo en desarrollo
-      ignore: 'pid,hostname,time', // Compact: elimina campos innecesarios
-      messageFormat: '{msg}{if bookingId} bookingId={bookingId}{end}{if action} action={action}{end}{if jobId} jobId={jobId}{end}', // Compact: solo keys relevantes
-      translateTime: 'HH:MM:ss.l', // Formato tiempo compacto
-      singleLine: true // Una línea por log
+  ...(isProduction ? {} : {
+    transport: {
+      target: 'pino-pretty',
+      options: {
+        colorize: !isProduction, // Color solo en desarrollo
+        ignore: 'pid,hostname,time', // Compact: elimina campos innecesarios
+        messageFormat: '{msg}{if bookingId} bookingId={bookingId}{end}{if action} action={action}{end}{if jobId} jobId={jobId}{end}', // Compact: solo keys relevantes
+        translateTime: 'HH:MM:ss.l', // Formato tiempo compacto
+        singleLine: true // Una línea por log
+      }
     }
-  }
+  })
 };
 
 export const logger = pino(loggerOptions);

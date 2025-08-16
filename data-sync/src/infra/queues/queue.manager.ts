@@ -164,8 +164,8 @@ export const beds24Worker = new Worker<JobData>(
         error: error.message,
         stack: error.stack,
         step: 'sync_phase',
-        bookingId: 'bookingId' in data ? data.bookingId || 'unknown' : 'unknown',
-        action: 'action' in data ? data.action || 'unknown' : 'unknown',
+        bookingId: ('bookingId' in data && data.bookingId) ? data.bookingId : 'unknown',
+        action: ('action' in data && data.action) ? data.action : 'unknown',
         duration: Date.now() - startTime
       }, '❌ Job processing failed at sync');
       throw error;
