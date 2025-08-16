@@ -167,8 +167,15 @@ export async function addWebhookJob(data, options) {
         priority: 'high',
         ...data
     };
+    const jobId = `beds24-sync-${data.bookingId}`;
+    const existingJob = await beds24Queue.getJob(jobId);
+    if (existingJob && !existingJob.isCompleted() && !existingJob.isFailed()) {
+        logger.debug({ bookingId: data.bookingId, existingJobId: existingJob.id }, 'Skipping duplicate job');
+        return existingJob;
+    }
     const job = await beds24Queue.add('webhook', jobData, {
         priority: 1,
+        jobId,
         ...options,
     });
     logger.info({

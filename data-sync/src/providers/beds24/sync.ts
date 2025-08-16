@@ -97,14 +97,14 @@ export async function processSingleBookingData(bookingData: any): Promise<{
     const phone = extractPhoneNumber(bookingData);
     const email = extractEmail(bookingData);
 
-    // Enhanced booking data with more complete information
+    // Enhanced booking data with more complete information and null-safe defaults
     const commonData = {
       bookingId,
-      phone,
-      guestName,
-      status: bookingData.status || null,
+      phone: phone || 'unknown',
+      guestName: guestName || 'Guest Unknown',
+      status: bookingData.status || 'confirmed',
       internalNotes: combineNotes(bookingData),
-      propertyName: mapPropertyName(bookingData.propertyId) || bookingData.propertyName || null,
+      propertyName: mapPropertyName(bookingData.propertyId) || bookingData.propertyName || 'Unknown Property',
       arrivalDate: formatDateSimple(bookingData.arrival),
       departureDate: formatDateSimple(bookingData.departure),
       numNights,
@@ -125,7 +125,7 @@ export async function processSingleBookingData(bookingData: any): Promise<{
       modifiedDate: formatDateSimple(bookingData.modified || bookingData.modifiedTime),
       lastUpdatedBD: new Date(),
       raw: bookingData, // Always store complete API response
-      BDStatus: bdStatus,
+      BDStatus: bdStatus || 'Confirmed',
     };
 
     // Handle different booking types
@@ -148,12 +148,25 @@ export async function processSingleBookingData(bookingData: any): Promise<{
         },
       });
 
-      logger.debug({ bookingId, action: existing ? 'updated' : 'created' }, 'Synced booking to main table');
+      logger.info({ 
+        bookingId, 
+        action: existing ? 'updated' : 'created',
+        table: 'Booking',
+        resultId: result.id,
+        guestName: result.guestName,
+        phone: result.phone
+      }, '✅ Successfully synced to BD - Booking table');
       return { success: true, action: existing ? 'updated' : 'created', table: 'Booking' };
     }
 
   } catch (error: any) {
-    logger.error({ error: error.message, bookingId: bookingData.bookingId }, 'Failed to sync single booking');
+    logger.error({ 
+      error: error.message, 
+      stack: error.stack,
+      bookingId: bookingData.bookingId || bookingData.id,
+      data: bookingData,
+      constraint: error.code === 'P2002' ? 'unique_constraint' : error.code
+    }, '❌ Failed to sync to BD - check constraints and data');
     return { success: false, action: 'skipped', table: 'Booking' };
   }
 }
@@ -207,7 +220,7 @@ async function syncActiveBooking(bookingData: any): Promise<{
       where: { bookingId: bookingData.bookingId }
     });
 
-    await prisma.booking.upsert({
+    const activeResult = await prisma.booking.upsert({
       where: { bookingId: bookingData.bookingId },
       create: bookingData,
       update: {
@@ -220,16 +233,24 @@ async function syncActiveBooking(bookingData: any): Promise<{
     // The trigger will handle the Leads table sync automatically
     // based on BDStatus = 'Futura Pendiente'
 
-    logger.debug({ 
+    logger.info({ 
       bookingId: bookingData.bookingId, 
       bdStatus: bookingData.BDStatus,
-      action: existingBooking ? 'updated' : 'created' 
-    }, 'Synced active booking');
+      action: existingBooking ? 'updated' : 'created',
+      resultId: activeResult.id,
+      table: 'Booking'
+    }, '✅ Successfully synced active booking to BD');
 
     return { success: true, action: existingBooking ? 'updated' : 'created', table: 'Booking' };
 
   } catch (error: any) {
-    logger.error({ error: error.message, bookingId: bookingData.bookingId }, 'Failed to sync active booking');
+    logger.error({ 
+      error: error.message, 
+      stack: error.stack,
+      bookingId: bookingData.bookingId,
+      bdStatus: bookingData.BDStatus,
+      constraint: error.code === 'P2002' ? 'unique_constraint' : error.code
+    }, '❌ Failed to sync active booking to BD');
     return { success: false, action: 'skipped', table: 'Booking' };
   }
 }

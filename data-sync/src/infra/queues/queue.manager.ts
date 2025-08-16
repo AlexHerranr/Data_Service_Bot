@@ -67,10 +67,20 @@ export const beds24Worker = new Worker<JobData>(
           action,
           webhookType: data.type
         }, 'Processing Beds24 webhook');
+        
+        logger.info({ jobId: job.id, bookingId, action }, 'Starting syncSingleBooking call');
 
         // Para CREATED, MODIFY o CANCEL, fetch booking completo y actualizar BD
         if (action === 'CREATED' || action === 'MODIFY' || action === 'CANCEL') {
-          await syncSingleBooking(bookingId);
+          const syncResult = await syncSingleBooking(bookingId);
+          logger.info({ 
+            jobId: job.id, 
+            bookingId, 
+            syncResult,
+            success: syncResult.success,
+            action: syncResult.action,
+            table: syncResult.table
+          }, '✅ syncSingleBooking completed');
           
           // Si es MODIFY, opcionalmente fetch messages
           if (action === 'MODIFY') {
@@ -148,8 +158,11 @@ export const beds24Worker = new Worker<JobData>(
         jobId: job.id, 
         error: error.message,
         stack: error.stack,
+        step: 'sync_phase',
+        bookingId: data.bookingId || 'unknown',
+        action: data.action || 'unknown',
         duration: Date.now() - startTime
-      }, 'Job failed');
+      }, '❌ Job processing failed at sync');
       throw error;
     }
   },

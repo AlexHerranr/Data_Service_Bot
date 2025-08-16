@@ -76,6 +76,9 @@ export class Beds24Client {
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
             try {
                 const response = await this.client.request(config);
+                if (response.status >= 400) {
+                    throw new Beds24Error(`HTTP error ${response.status}`, response.status);
+                }
                 if (!response.data.success) {
                     throw new Beds24Error(response.data.error || 'API request failed', response.data.code, response.data);
                 }
@@ -83,6 +86,9 @@ export class Beds24Client {
             }
             catch (error) {
                 lastError = error;
+                if (error.response?.status === 401 || error.response?.status === 403) {
+                    throw new Beds24Error('Token de autenticación inválido o expirado', error.response.status);
+                }
                 logger.warn({
                     attempt,
                     maxRetries,
@@ -90,7 +96,7 @@ export class Beds24Client {
                     url: config.url,
                 }, 'Request failed, retrying...');
                 if (attempt < maxRetries) {
-                    const delay = retryDelay * Math.pow(2, attempt - 1) + Math.random() * 1000;
+                    const delay = retryDelay * Math.pow(2, attempt - 1);
                     await new Promise(resolve => setTimeout(resolve, delay));
                 }
             }
@@ -124,8 +130,9 @@ export class Beds24Client {
             logger.debug({ bookingId }, 'Fetching single booking');
             const response = await this.requestWithRetry({
                 method: 'GET',
-                url: `/bookings/${bookingId}`,
+                url: '/bookings',
                 params: {
+                    id: bookingId,
                     includeInvoice: true,
                     includeInfoItems: true,
                     includeComments: true,

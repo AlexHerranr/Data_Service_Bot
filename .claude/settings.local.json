@@ -28,7 +28,26 @@
       "Bash(npm test)",
       "Bash(timeout 30 npm run dev)",
       "Bash(DATABASE_URL=\"postgresql://postgres:slTVdKuHwjEfvxJEjGtMVTwSTYzdbfuR@turntable.proxy.rlwy.net:43146/railway\" npx prisma db pull --schema=prisma/schema.prisma)",
-      "Bash(DATABASE_URL=:*)"
+      "Bash(DATABASE_URL=:*)",
+      "Bash(for i in {15..1})",
+      "Bash(do echo \"⏱️  $i seconds remaining...\")",
+      "Bash(done)",
+      "Bash(for i in {30..1})",
+      "Bash(railway link:*)",
+      "Bash(railway status:*)",
+      "Bash(railway projects:*)",
+      "Bash(railway login:*)",
+      "Bash(railway help:*)",
+      "Bash(railway whoami:*)",
+      "Bash(timeout:*)",
+      "Bash(railway unlink:*)",
+      "Bash(railway logs:*)",
+      "Bash(docker run:*)",
+      "Bash(railway variables:*)",
+      "Bash(railway redeploy:*)",
+      "Bash(railway connect:*)",
+      "Bash(railway service:*)",
+      "Bash(npx prisma:*)"
     ],
     "defaultMode": "acceptEdits"
   }

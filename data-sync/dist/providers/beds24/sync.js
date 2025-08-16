@@ -4,6 +4,10 @@ import { prisma } from '../../infra/db/prisma.client.js';
 import { logger } from '../../utils/logger.js';
 export async function syncSingleBooking(bookingId) {
     try {
+        if (String(bookingId).startsWith('999')) {
+            logger.debug({ bookingId }, 'Skipping test booking');
+            return { success: true, action: 'skipped', table: 'Booking' };
+        }
         logger.info({ bookingId }, 'Starting sync for booking');
         const client = getBeds24Client();
         const bookingData = await client.getBooking(bookingId);

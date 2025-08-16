@@ -27,6 +27,7 @@
     "update:messages": "tsx scripts/update-all-messages.ts",
     "update:messages:specific": "tsx scripts/update-all-messages.ts",
     "test:railway-token": "tsx scripts/test-railway-token.ts",
+    "create:test-booking": "tsx scripts/create-test-booking.ts",
     "typecheck": "npx tsc --noEmit",
     "test-build": "npm run typecheck && npm run build"
   },

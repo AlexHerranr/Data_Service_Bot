@@ -15,18 +15,21 @@ const __dirname = path.dirname(__filename);
 
 // Configuración
 const LOG_DIR = path.join(__dirname, '..', 'logs', 'railway');
-const MAX_CHUNKS = 25; // Máximo número de chunks a mantener (más archivos para logs detallados)
+const MAX_CHUNKS = 3; // Máximo número de chunks a mantener (automático cleanup)
 
 // Crear directorio si no existe
 if (!fs.existsSync(LOG_DIR)) {
     fs.mkdirSync(LOG_DIR, { recursive: true });
 }
 
-// Función para limpiar chunks antiguos
+// Función para limpiar chunks antiguos - mantener solo los 3 más recientes
 function cleanupOldChunks() {
     try {
-        const files = fs.readdirSync(LOG_DIR)
-            .filter(file => file.startsWith('railway-logs-') && file.endsWith('.log'))
+        console.log('🧹 Limpiando archivos antiguos...');
+        
+        // Obtener TODOS los archivos de logs (no solo railway-logs-)
+        const allFiles = fs.readdirSync(LOG_DIR)
+            .filter(file => file.endsWith('.log'))
             .map(file => ({
                 name: file,
                 path: path.join(LOG_DIR, file),
@@ -34,16 +37,24 @@ function cleanupOldChunks() {
             }))
             .sort((a, b) => b.stats.mtime.getTime() - a.stats.mtime.getTime());
 
-        if (files.length > MAX_CHUNKS) {
-            const filesToDelete = files.slice(MAX_CHUNKS);
+        console.log(`📁 Archivos encontrados: ${allFiles.length}`);
+        
+        if (allFiles.length > MAX_CHUNKS) {
+            const filesToDelete = allFiles.slice(MAX_CHUNKS);
+            console.log(`🗑️ Eliminando ${filesToDelete.length} archivos antiguos...`);
+            
             filesToDelete.forEach(file => {
                 try {
                     fs.unlinkSync(file.path);
-                    console.log(`🗑️ Chunk antiguo eliminado: ${file.name}`);
+                    console.log(`   ✅ Eliminado: ${file.name}`);
                 } catch (error) {
-                    console.error(`Error eliminando ${file.name}:`, error.message);
+                    console.error(`   ❌ Error eliminando ${file.name}:`, error.message);
                 }
             });
+            
+            console.log(`✨ Limpieza completada. Archivos restantes: ${allFiles.length - filesToDelete.length}`);
+        } else {
+            console.log(`✅ No hay archivos para eliminar (${allFiles.length}/${MAX_CHUNKS})`);
         }
     } catch (error) {
         console.error('Error limpiando chunks antiguos:', error.message);
