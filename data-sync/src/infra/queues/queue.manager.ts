@@ -174,7 +174,7 @@ export const beds24Worker = new Worker<JobData>(
   {
     connection: redis,
     concurrency: 2, // Reducir concurrencia para evitar timeouts
-    stallInterval: 30000, // 30s default explicit per docs
+    stalledInterval: 30000, // 30s default explicit per docs
     limiter: {
       max: 5,
       duration: 1000, // 5 jobs por segundo

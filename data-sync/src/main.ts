@@ -1,6 +1,5 @@
 import express from 'express';
 import promBundle from 'express-prom-bundle';
-import './infra/queues/queue.manager.js'; // Force worker initialization early
 import swaggerUi from 'swagger-ui-express';
 import { connectPrisma } from './infra/db/prisma.client.js';
 import { connectRedis } from './infra/redis/redis.client.js';
