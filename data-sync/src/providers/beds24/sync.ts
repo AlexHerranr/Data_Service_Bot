@@ -134,36 +134,31 @@ export async function processSingleBookingData(bookingData: any): Promise<{
       logger.debug({ bookingId, messageCount: commonData.messages?.length || 0 }, 'Enhanced message extraction for MODIFY action');
     }
 
-    // Handle different booking types
-    if (isCancelledBooking(bookingData)) {
-      return await syncCancelledBooking(commonData);
-    } else if (shouldSyncAsLead(bookingData) || shouldSyncAsConfirmed(bookingData)) {
-      return await syncActiveBooking(commonData);
-    } else {
-      // Regular booking - sync to main Booking table
-      const existing = await prisma.booking.findUnique({
-        where: { bookingId }
-      });
+    // Sync ALL bookings to main Booking table (simplified routing)
+    const existing = await prisma.booking.findUnique({
+      where: { bookingId }
+    });
 
-      const result = await prisma.booking.upsert({
-        where: { bookingId },
-        create: commonData,
-        update: {
-          ...commonData,
-          id: undefined, // Don't update ID
-        },
-      });
+    const result = await prisma.booking.upsert({
+      where: { bookingId },
+      create: commonData,
+      update: {
+        ...commonData,
+        id: undefined, // Don't update ID
+      },
+    });
 
-      logger.info({ 
-        bookingId, 
-        action: existing ? 'updated' : 'created',
-        table: 'Booking',
-        resultId: result.id,
-        guestName: result.guestName,
-        phone: result.phone
-      }, '✅ Successfully synced to BD - Booking table');
-      return { success: true, action: existing ? 'updated' : 'created', table: 'Booking' };
-    }
+    logger.info({ 
+      bookingId, 
+      action: existing ? 'updated' : 'created',
+      table: 'Booking',
+      resultId: result.id,
+      guestName: result.guestName,
+      phone: result.phone,
+      status: result.status,
+      bdStatus: result.BDStatus
+    }, '✅ Successfully synced to BD - Booking table');
+    return { success: true, action: existing ? 'updated' : 'created', table: 'Booking' };
 
   } catch (error: any) {
     logger.error({ 
