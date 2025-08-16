@@ -43,6 +43,11 @@ export async function syncSingleBooking(bookingId: string): Promise<{
   table: 'Booking' | 'Leads' | 'ReservationsCancelled';
 }> {
   try {
+    if (String(bookingId).startsWith('999')) {
+      logger.debug({ bookingId }, 'Skipping test booking');
+      return { success: true, action: 'skipped', table: 'Booking' };
+    }
+
     logger.info({ bookingId }, 'Starting sync for booking');
 
     // Fetch complete booking data from Beds24 API

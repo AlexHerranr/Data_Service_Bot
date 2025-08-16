@@ -217,8 +217,18 @@ export async function addWebhookJob(
     ...data
   };
   
+  // Deduplicación de jobs - evitar duplicados por bookingId
+  const jobId = `beds24-sync-${data.bookingId}`;
+  const existingJob = await beds24Queue.getJob(jobId);
+  
+  if (existingJob && !existingJob.isCompleted() && !existingJob.isFailed()) {
+    logger.debug({ bookingId: data.bookingId, existingJobId: existingJob.id }, 'Skipping duplicate job');
+    return existingJob;
+  }
+
   const job = await beds24Queue.add('webhook', jobData, {
     priority: 1, // Alta prioridad para webhooks
+    jobId, // Usar jobId único para deduplicación
     ...options,
   });
   
