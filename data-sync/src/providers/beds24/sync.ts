@@ -112,7 +112,7 @@ export async function processSingleBookingData(bookingData: any): Promise<{
       totalCharges: totalCharges.toString(),
       totalPayments: totalPayments.toString(),
       balance: balance.toString(),
-      basePrice: bookingData.price || null,
+      basePrice: bookingData.price != null ? String(bookingData.price) : null,
       channel: determineChannel(bookingData) || 'unknown',
       email: email || 'unknown',
       apiReference: bookingData.apiReference || null,
