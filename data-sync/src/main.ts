@@ -1,5 +1,6 @@
 import express from 'express';
 import promBundle from 'express-prom-bundle';
+import './infra/queues/queue.manager.js'; // Force worker initialization early
 import swaggerUi from 'swagger-ui-express';
 import { connectPrisma } from './infra/db/prisma.client.js';
 import { connectRedis } from './infra/redis/redis.client.js';
@@ -14,6 +15,7 @@ import { register } from './infra/metrics/prometheus.js';
 import { swaggerSpec } from './docs/openapi.js';
 import { env } from './config/env.js';
 import { logger } from './utils/logger.js';
+import { beds24Worker, closeQueues } from './infra/queues/queue.manager.js';
 
 async function main() {
   const app = express();
@@ -45,6 +47,11 @@ async function main() {
     logger.warn({ error: error.message }, '⚠️ Beds24 write operations will not be available - continuing without write auth');
     // Continue startup even if Beds24 init fails (READ operations still work)
   }
+
+  // Initialize BullMQ worker
+  logger.info('🔄 Starting BullMQ worker...');
+  // Worker is already initialized by importing from queue.manager.js
+  logger.info('✅ BullMQ worker started successfully');
   
   // Routes
   const router = express.Router();
@@ -123,6 +130,19 @@ async function main() {
     logger.info(`[data-sync] listening on :${env.PORT}`);
   });
 }
+
+// Graceful shutdown
+process.on('SIGTERM', async () => {
+  logger.info('SIGTERM received, shutting down gracefully...');
+  await closeQueues();
+  process.exit(0);
+});
+
+process.on('SIGINT', async () => {
+  logger.info('SIGINT received, shutting down gracefully...');
+  await closeQueues();
+  process.exit(0);
+});
 
 main().catch((error) => {
   logger.error({ error: error.message }, 'Failed to start data-sync');

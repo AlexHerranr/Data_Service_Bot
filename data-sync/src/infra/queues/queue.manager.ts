@@ -174,6 +174,7 @@ export const beds24Worker = new Worker<JobData>(
   {
     connection: redis,
     concurrency: 2, // Reducir concurrencia para evitar timeouts
+    stallInterval: 30000, // 30s default explicit per docs
     limiter: {
       max: 5,
       duration: 1000, // 5 jobs por segundo
@@ -209,6 +210,10 @@ beds24Worker.on('failed', async (job, err) => {
       attempt: job?.attemptsMade || 0
     }, 'Job failed, will retry');
   }
+});
+
+beds24Worker.on('ready', () => {
+  logger.info('✅ Beds24 worker ready to process jobs');
 });
 
 beds24Worker.on('error', (err) => {
