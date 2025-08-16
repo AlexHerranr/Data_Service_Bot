@@ -5,7 +5,6 @@ import { env } from '../../../config/env.js';
 function verifyBeds24Token(req, res, next) {
     const token = req.headers['x-beds24-token'] || req.headers['authorization']?.replace('Bearer ', '');
     if (!env.BEDS24_WEBHOOK_TOKEN) {
-        logger.warn('BEDS24_WEBHOOK_TOKEN not configured, skipping verification');
         return next();
     }
     if (token !== env.BEDS24_WEBHOOK_TOKEN) {

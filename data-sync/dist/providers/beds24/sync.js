@@ -1,5 +1,5 @@
 import { getBeds24Client } from './client.js';
-import { formatDateSimple, extractChargesAndPayments, extractInfoItems, calculateNights, determineBDStatus, shouldSyncAsLead, shouldSyncAsConfirmed, isCancelledBooking, extractGuestName, extractPhoneNumber, extractEmail, combineNotes, calculateTotalPersons, determineChannel, extractMessages, mapPropertyName } from './utils.js';
+import { formatDateSimple, extractChargesAndPayments, extractInfoItems, calculateNights, determineBDStatus, shouldSyncAsLead, shouldSyncAsConfirmed, extractGuestName, extractPhoneNumber, extractEmail, combineNotes, calculateTotalPersons, determineChannel, extractMessages, mapPropertyName } from './utils.js';
 import { prisma } from '../../infra/db/prisma.client.js';
 import { logger } from '../../utils/logger.js';
 export async function syncSingleBooking(bookingId) {
@@ -39,57 +39,68 @@ export async function processSingleBookingData(bookingData) {
         const email = extractEmail(bookingData);
         const commonData = {
             bookingId,
-            phone,
-            guestName,
-            status: bookingData.status || null,
+            phone: phone || 'unknown',
+            guestName: guestName || 'Guest Unknown',
+            status: bookingData.status || 'confirmed',
             internalNotes: combineNotes(bookingData),
-            propertyName: mapPropertyName(bookingData.propertyId) || bookingData.propertyName || null,
-            arrivalDate: formatDateSimple(bookingData.arrival),
-            departureDate: formatDateSimple(bookingData.departure),
+            propertyName: mapPropertyName(bookingData.propertyId) || bookingData.propertyName || 'Unknown Property',
+            arrivalDate: formatDateSimple(bookingData.arrival) || new Date().toISOString().split('T')[0],
+            departureDate: formatDateSimple(bookingData.departure) || new Date().toISOString().split('T')[0],
             numNights,
             totalPersons: calculateTotalPersons(bookingData),
             totalCharges: totalCharges.toString(),
             totalPayments: totalPayments.toString(),
             balance: balance.toString(),
-            basePrice: bookingData.price || null,
-            channel: determineChannel(bookingData),
-            email,
+            basePrice: bookingData.price != null ? String(bookingData.price) : null,
+            channel: determineChannel(bookingData) || 'unknown',
+            email: email || 'unknown',
             apiReference: bookingData.apiReference || null,
             charges: charges,
             payments: payments,
             messages: extractMessages(bookingData),
             infoItems,
-            notes: bookingData.comments || null,
+            notes: bookingData.comments || 'no notes',
             bookingDate: formatDateSimple(bookingData.created || bookingData.bookingTime),
             modifiedDate: formatDateSimple(bookingData.modified || bookingData.modifiedTime),
             lastUpdatedBD: new Date(),
             raw: bookingData,
-            BDStatus: bdStatus,
+            BDStatus: bdStatus || 'Confirmed',
         };
-        if (isCancelledBooking(bookingData)) {
-            return await syncCancelledBooking(commonData);
+        if (bookingData.action === 'MODIFY' || bookingData.action === 'modified') {
+            commonData.messages = extractMessages(bookingData);
+            logger.debug({ bookingId, messageCount: commonData.messages?.length || 0 }, 'Enhanced message extraction for MODIFY action');
         }
-        else if (shouldSyncAsLead(bookingData) || shouldSyncAsConfirmed(bookingData)) {
-            return await syncActiveBooking(commonData);
-        }
-        else {
-            const existing = await prisma.booking.findUnique({
-                where: { bookingId }
-            });
-            const result = await prisma.booking.upsert({
-                where: { bookingId },
-                create: commonData,
-                update: {
-                    ...commonData,
-                    id: undefined,
-                },
-            });
-            logger.debug({ bookingId, action: existing ? 'updated' : 'created' }, 'Synced booking to main table');
-            return { success: true, action: existing ? 'updated' : 'created', table: 'Booking' };
-        }
+        const existing = await prisma.booking.findUnique({
+            where: { bookingId }
+        });
+        const result = await prisma.booking.upsert({
+            where: { bookingId },
+            create: commonData,
+            update: {
+                ...commonData,
+                id: undefined,
+            },
+        });
+        logger.info({
+            bookingId,
+            action: existing ? 'updated' : 'created',
+            table: 'Booking',
+            resultId: result.id,
+            guestName: result.guestName,
+            phone: result.phone,
+            status: result.status,
+            bdStatus: result.BDStatus
+        }, '✅ Successfully synced to BD - Booking table');
+        return { success: true, action: existing ? 'updated' : 'created', table: 'Booking' };
     }
     catch (error) {
-        logger.error({ error: error.message, bookingId: bookingData.bookingId }, 'Failed to sync single booking');
+        logger.error({
+            error: error.message,
+            stack: error.stack,
+            bookingId: bookingData.bookingId || bookingData.id,
+            data: bookingData,
+            constraint: error.code === 'P2002' ? 'unique_constraint' : error.code
+        }, '❌ Failed to sync to BD - check constraints and data');
         return { success: false, action: 'skipped', table: 'Booking' };
     }
 }
@@ -102,12 +113,12 @@ async function syncCancelledBooking(bookingData) {
             where: { bookingId: bookingData.bookingId },
             create: {
                 ...bookingData,
-                cancelledAt: new Date(),
+                status: 'cancelled',
             },
             update: {
                 ...bookingData,
                 id: undefined,
-                updatedAt: new Date(),
+                status: 'cancelled',
             },
         });
         logger.debug({ bookingId: bookingData.bookingId, action: existing ? 'updated' : 'created' }, 'Synced cancelled booking');
@@ -123,7 +134,7 @@ async function syncActiveBooking(bookingData) {
         const existingBooking = await prisma.booking.findUnique({
             where: { bookingId: bookingData.bookingId }
         });
-        await prisma.booking.upsert({
+        const activeResult = await prisma.booking.upsert({
             where: { bookingId: bookingData.bookingId },
             create: bookingData,
             update: {
@@ -131,15 +142,23 @@ async function syncActiveBooking(bookingData) {
                 id: undefined,
             },
         });
-        logger.debug({
+        logger.info({
             bookingId: bookingData.bookingId,
             bdStatus: bookingData.BDStatus,
-            action: existingBooking ? 'updated' : 'created'
-        }, 'Synced active booking');
+            action: existingBooking ? 'updated' : 'created',
+            resultId: activeResult.id,
+            table: 'Booking'
+        }, '✅ Successfully synced active booking to BD');
         return { success: true, action: existingBooking ? 'updated' : 'created', table: 'Booking' };
     }
     catch (error) {
-        logger.error({ error: error.message, bookingId: bookingData.bookingId }, 'Failed to sync active booking');
+        logger.error({
+            error: error.message,
+            stack: error.stack,
+            bookingId: bookingData.bookingId,
+            bdStatus: bookingData.BDStatus,
+            constraint: error.code === 'P2002' ? 'unique_constraint' : error.code
+        }, '❌ Failed to sync active booking to BD');
         return { success: false, action: 'skipped', table: 'Booking' };
     }
 }

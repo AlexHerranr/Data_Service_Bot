@@ -14,6 +14,7 @@ import { register } from './infra/metrics/prometheus.js';
 import { swaggerSpec } from './docs/openapi.js';
 import { env } from './config/env.js';
 import { logger } from './utils/logger.js';
+import { closeQueues } from './infra/queues/queue.manager.js';
 async function main() {
     const app = express();
     app.use(express.json());
@@ -36,6 +37,8 @@ async function main() {
     catch (error) {
         logger.warn({ error: error.message }, '⚠️ Beds24 write operations will not be available - continuing without write auth');
     }
+    logger.info('🔄 Starting BullMQ worker...');
+    logger.info('✅ BullMQ worker started successfully');
     const router = express.Router();
     registerHealthRoute(router);
     registerBeds24Webhook(router);
@@ -100,6 +103,16 @@ async function main() {
         logger.info(`[data-sync] listening on :${env.PORT}`);
     });
 }
+process.on('SIGTERM', async () => {
+    logger.info('SIGTERM received, shutting down gracefully...');
+    await closeQueues();
+    process.exit(0);
+});
+process.on('SIGINT', async () => {
+    logger.info('SIGINT received, shutting down gracefully...');
+    await closeQueues();
+    process.exit(0);
+});
 main().catch((error) => {
     logger.error({ error: error.message }, 'Failed to start data-sync');
     process.exit(1);

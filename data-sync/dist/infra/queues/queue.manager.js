@@ -40,8 +40,20 @@ export const beds24Worker = new Worker('beds24-sync', async (job) => {
                 action,
                 webhookType: data.type
             }, 'Processing Beds24 webhook');
+            logger.info({ jobId: job.id, bookingId, action }, 'Starting syncSingleBooking call');
             if (action === 'CREATED' || action === 'MODIFY' || action === 'CANCEL') {
-                await syncSingleBooking(bookingId);
+                const syncResult = await syncSingleBooking(bookingId);
+                logger.info({
+                    jobId: job.id,
+                    bookingId,
+                    syncResult,
+                    success: syncResult.success,
+                    action: syncResult.action,
+                    table: syncResult.table
+                }, '✅ syncSingleBooking completed');
+                if (!syncResult.success) {
+                    throw new Error(`Sync failed: ${syncResult.action} - ${syncResult.table}`);
+                }
                 if (action === 'MODIFY') {
                     try {
                         logger.debug({ bookingId }, 'Message sync could be implemented here');
@@ -115,13 +127,17 @@ export const beds24Worker = new Worker('beds24-sync', async (job) => {
             jobId: job.id,
             error: error.message,
             stack: error.stack,
+            step: 'sync_phase',
+            bookingId: 'bookingId' in data ? data.bookingId || 'unknown' : 'unknown',
+            action: 'action' in data ? data.action || 'unknown' : 'unknown',
             duration: Date.now() - startTime
-        }, 'Job failed');
+        }, '❌ Job processing failed at sync');
         throw error;
     }
 }, {
     connection: redis,
     concurrency: 2,
+    stalledInterval: 30000,
     limiter: {
         max: 5,
         duration: 1000,
@@ -152,6 +168,9 @@ beds24Worker.on('failed', async (job, err) => {
             attempt: job?.attemptsMade || 0
         }, 'Job failed, will retry');
     }
+});
+beds24Worker.on('ready', () => {
+    logger.info('✅ Beds24 worker ready to process jobs');
 });
 beds24Worker.on('error', (err) => {
     if (err.message && err.message.includes('Command timed out')) {
