@@ -105,28 +105,34 @@ export async function processSingleBookingData(bookingData: any): Promise<{
       status: bookingData.status || 'confirmed',
       internalNotes: combineNotes(bookingData),
       propertyName: mapPropertyName(bookingData.propertyId) || bookingData.propertyName || 'Unknown Property',
-      arrivalDate: formatDateSimple(bookingData.arrival),
-      departureDate: formatDateSimple(bookingData.departure),
+      arrivalDate: formatDateSimple(bookingData.arrival) || new Date().toISOString().split('T')[0],
+      departureDate: formatDateSimple(bookingData.departure) || new Date().toISOString().split('T')[0],
       numNights,
       totalPersons: calculateTotalPersons(bookingData),
       totalCharges: totalCharges.toString(),
       totalPayments: totalPayments.toString(),
       balance: balance.toString(),
       basePrice: bookingData.price || null,
-      channel: determineChannel(bookingData),
-      email,
+      channel: determineChannel(bookingData) || 'unknown',
+      email: email || 'unknown',
       apiReference: bookingData.apiReference || null,
       charges: charges,
       payments: payments,
       messages: extractMessages(bookingData),
       infoItems,
-      notes: bookingData.comments || null,
+      notes: bookingData.comments || 'no notes',
       bookingDate: formatDateSimple(bookingData.created || bookingData.bookingTime),
       modifiedDate: formatDateSimple(bookingData.modified || bookingData.modifiedTime),
       lastUpdatedBD: new Date(),
       raw: bookingData, // Always store complete API response
       BDStatus: bdStatus || 'Confirmed',
     };
+
+    // Enhanced message handling for MODIFY actions
+    if (bookingData.action === 'MODIFY' || bookingData.action === 'modified') {
+      commonData.messages = extractMessages(bookingData);
+      logger.debug({ bookingId, messageCount: commonData.messages?.length || 0 }, 'Enhanced message extraction for MODIFY action');
+    }
 
     // Handle different booking types
     if (isCancelledBooking(bookingData)) {
