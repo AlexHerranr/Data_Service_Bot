@@ -194,12 +194,12 @@ async function syncCancelledBooking(bookingData: any): Promise<{
       where: { bookingId: bookingData.bookingId },
       create: {
         ...bookingData,
-        cancelledAt: new Date(),
+        status: 'cancelled', // Mark as cancelled in status field
       },
       update: {
         ...bookingData,
         id: undefined,
-        updatedAt: new Date(),
+        status: 'cancelled', // Mark as cancelled in status field
       },
     });
 

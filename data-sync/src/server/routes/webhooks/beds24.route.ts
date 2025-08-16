@@ -9,7 +9,7 @@ function verifyBeds24Token(req: Request, res: Response, next: Function) {
   const token = req.headers['x-beds24-token'] || req.headers['authorization']?.replace('Bearer ', '');
   
   if (!env.BEDS24_WEBHOOK_TOKEN) {
-    logger.warn('BEDS24_WEBHOOK_TOKEN not configured, skipping verification');
+    // No token configured - allow all webhooks (no verification)
     return next();
   }
   

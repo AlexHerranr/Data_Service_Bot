@@ -82,6 +82,11 @@ export const beds24Worker = new Worker<JobData>(
             table: syncResult.table
           }, '✅ syncSingleBooking completed');
           
+          // ✅ VERIFICAR SUCCESS antes de marcar como completado
+          if (!syncResult.success) {
+            throw new Error(`Sync failed: ${syncResult.action} - ${syncResult.table}`);
+          }
+          
           // Si es MODIFY, opcionalmente fetch messages
           if (action === 'MODIFY') {
             try {
