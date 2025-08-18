@@ -49,15 +49,29 @@ export const beds24Worker = new Worker<JobData>(
       type: data.type, 
       attempt: job.attemptsMade + 1,
       maxAttempts: job.opts.attempts || 3
-    }, 'Processing job');
+    }, '🚀 STEP 1: Processing job started');
+    
+    logger.info({ jobId: job.id, data }, '📊 STEP 2: Job data received');
 
     try {
+      logger.info({ jobId: job.id }, '🔍 STEP 3: Starting job type detection');
+      
       if (data.type === 'webhook' || data.type === 'beds24-webhook') {
+        logger.info({ jobId: job.id, type: data.type }, '📨 STEP 4: Detected webhook job type');
+        
         const webhookData = data as any; // Flexible para nuevos webhooks
         const bookingId = webhookData.bookingId || webhookData.payload?.id;
         const action = webhookData.action || webhookData.payload?.action || 'MODIFY';
         
+        logger.info({ 
+          jobId: job.id, 
+          bookingId, 
+          action,
+          webhookDataKeys: Object.keys(webhookData)
+        }, '🔑 STEP 5: Extracted webhook data');
+        
         if (!bookingId) {
+          logger.error({ jobId: job.id, webhookData }, '❌ STEP 5.1: No booking ID found in webhook data');
           throw new Error('No booking ID found in webhook data');
         }
 
@@ -66,13 +80,16 @@ export const beds24Worker = new Worker<JobData>(
           bookingId,
           action,
           webhookType: data.type
-        }, 'Processing Beds24 webhook');
+        }, '🎯 STEP 6: Processing Beds24 webhook');
         
-        logger.info({ jobId: job.id, bookingId, action }, 'Starting syncSingleBooking call');
+        logger.info({ jobId: job.id, bookingId, action }, '🔄 STEP 7: Starting syncSingleBooking call');
 
         // Para CREATED, MODIFY o CANCEL, fetch booking completo y actualizar BD
         if (action === 'CREATED' || action === 'MODIFY' || action === 'CANCEL') {
+          logger.info({ jobId: job.id, bookingId, action }, '📡 STEP 8: Calling syncSingleBooking function');
+          
           const syncResult = await syncSingleBooking(bookingId);
+          
           logger.info({ 
             jobId: job.id, 
             bookingId, 
@@ -80,15 +97,23 @@ export const beds24Worker = new Worker<JobData>(
             success: syncResult.success,
             action: syncResult.action,
             table: syncResult.table
-          }, '✅ syncSingleBooking completed');
+          }, '📋 STEP 9: syncSingleBooking completed');
           
           // ✅ VERIFICAR SUCCESS antes de marcar como completado
           if (!syncResult.success) {
+            logger.error({ 
+              jobId: job.id, 
+              bookingId, 
+              syncResult 
+            }, '❌ STEP 9.1: Sync failed, will throw error');
             throw new Error(`Sync failed: ${syncResult.action} - ${syncResult.table}`);
           }
           
+          logger.info({ jobId: job.id, bookingId }, '✅ STEP 10: Sync success verified');
+          
           // Si es MODIFY, opcionalmente fetch messages
           if (action === 'MODIFY') {
+            logger.info({ jobId: job.id, bookingId }, '💬 STEP 11: Processing MODIFY messages');
             try {
               // TODO: Implement message sync if needed
               logger.debug({ bookingId }, 'Message sync could be implemented here');
@@ -99,15 +124,23 @@ export const beds24Worker = new Worker<JobData>(
               }, 'Message sync failed, continuing');
             }
           }
+        } else {
+          logger.warn({ 
+            jobId: job.id, 
+            bookingId, 
+            action 
+          }, '⚠️ STEP 8.1: Action not in [CREATED, MODIFY, CANCEL] - skipping sync');
         }
 
+        logger.info({ jobId: job.id }, '📊 STEP 12: Recording metrics');
         metricsHelpers.recordJobComplete(data.type, startTime, 'success');
+        
         logger.info({ 
           jobId: job.id, 
           bookingId,
           action,
           duration: Date.now() - startTime
-        }, 'Beds24 webhook job completed');
+        }, '🎉 STEP 13: Beds24 webhook job completed successfully');
         
       } else if (data.type === 'single') {
         const singleData = data as SingleSyncJob;

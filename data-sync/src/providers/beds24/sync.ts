@@ -43,29 +43,39 @@ export async function syncSingleBooking(bookingId: string): Promise<{
   table: 'Booking' | 'Leads' | 'ReservationsCancelled';
 }> {
   try {
+    logger.info({ bookingId }, '🔍 SYNC STEP A: syncSingleBooking started');
+    
     if (String(bookingId).startsWith('999')) {
-      logger.debug({ bookingId }, 'Skipping test booking');
+      logger.debug({ bookingId }, '🧪 SYNC STEP A.1: Skipping test booking');
       return { success: true, action: 'skipped', table: 'Booking' };
     }
 
-    logger.info({ bookingId }, 'Starting sync for booking');
+    logger.info({ bookingId }, '🚀 SYNC STEP B: Starting sync for booking');
 
     // Fetch complete booking data from Beds24 API
+    logger.info({ bookingId }, '🌐 SYNC STEP C: Getting Beds24 client');
     const client = getBeds24Client();
+    
+    logger.info({ bookingId }, '📡 SYNC STEP D: Fetching booking from Beds24 API');
     const bookingData = await client.getBooking(bookingId);
 
     if (!bookingData) {
-      logger.warn({ bookingId }, 'Booking not found in Beds24');
+      logger.warn({ bookingId }, '⚠️ SYNC STEP D.1: Booking not found in Beds24');
       return { success: false, action: 'skipped', table: 'Booking' };
     }
 
-    logger.debug({ bookingId, bookingData }, 'Fetched complete booking data from API');
+    logger.info({ bookingId, hasData: !!bookingData }, '✅ SYNC STEP E: Fetched complete booking data from API');
 
     // Process the complete booking data
+    logger.info({ bookingId }, '⚙️ SYNC STEP F: Starting processSingleBookingData');
     return await processSingleBookingData(bookingData);
 
   } catch (error: any) {
-    logger.error({ error: error.message, bookingId }, 'Failed to sync single booking');
+    logger.error({ 
+      error: error.message, 
+      stack: error.stack,
+      bookingId 
+    }, '💥 SYNC ERROR: Failed to sync single booking');
     return { success: false, action: 'skipped', table: 'Booking' };
   }
 }
@@ -79,13 +89,19 @@ export async function processSingleBookingData(bookingData: any): Promise<{
   table: 'Booking' | 'Leads' | 'ReservationsCancelled';
 }> {
   try {
+    logger.info({}, '🏁 PROCESS STEP 1: processSingleBookingData started');
+    
     // Extract booking ID from different possible fields
     const bookingId = (bookingData.bookingId || bookingData.id)?.toString();
+    logger.info({ bookingId, hasBookingData: !!bookingData }, '🔑 PROCESS STEP 2: Extracted booking ID');
+    
     if (!bookingId) {
-      logger.warn({ bookingData }, 'Booking missing bookingId/id');
+      logger.warn({ bookingData }, '❌ PROCESS STEP 2.1: Booking missing bookingId/id');
       return { success: false, action: 'skipped', table: 'Booking' };
     }
 
+    logger.info({ bookingId }, '⚙️ PROCESS STEP 3: Starting data extraction and transformation');
+    
     // Extract and transform data from complete Beds24 API response
     const { charges, payments, totalCharges, totalPayments, balance } = extractChargesAndPayments(bookingData);
     const infoItems = extractInfoItems(bookingData);
@@ -96,6 +112,14 @@ export async function processSingleBookingData(bookingData: any): Promise<{
     const guestName = extractGuestName(bookingData);
     const phone = extractPhoneNumber(bookingData);
     const email = extractEmail(bookingData);
+    
+    logger.info({ 
+      bookingId, 
+      guestName, 
+      phone: phone || 'none', 
+      status: bookingData.status,
+      totalCharges: totalCharges.toString()
+    }, '📊 PROCESS STEP 4: Data extraction completed');
 
     // Enhanced booking data with more complete information and null-safe defaults
     const commonData = {
@@ -128,17 +152,29 @@ export async function processSingleBookingData(bookingData: any): Promise<{
       BDStatus: bdStatus || 'Confirmed',
     };
 
+    logger.info({ bookingId }, '📝 PROCESS STEP 5: Creating common data object');
+
     // Enhanced message handling for MODIFY actions
     if (bookingData.action === 'MODIFY' || bookingData.action === 'modified') {
       commonData.messages = extractMessages(bookingData);
       logger.debug({ bookingId, messageCount: commonData.messages?.length || 0 }, 'Enhanced message extraction for MODIFY action');
     }
 
+    logger.info({ bookingId }, '🔍 PROCESS STEP 6: Checking if booking exists in BD');
+    
     // Sync ALL bookings to main Booking table (simplified routing)
     const existing = await prisma.booking.findUnique({
       where: { bookingId }
     });
+    
+    logger.info({ 
+      bookingId, 
+      existsInDB: !!existing,
+      willCreateNew: !existing 
+    }, '📊 PROCESS STEP 7: Database check completed');
 
+    logger.info({ bookingId }, '💾 PROCESS STEP 8: Starting database upsert operation');
+    
     const result = await prisma.booking.upsert({
       where: { bookingId },
       create: commonData,
@@ -147,6 +183,12 @@ export async function processSingleBookingData(bookingData: any): Promise<{
         id: undefined, // Don't update ID
       },
     });
+    
+    logger.info({ 
+      bookingId, 
+      dbResultId: result.id,
+      wasCreated: !existing
+    }, '✅ PROCESS STEP 9: Database upsert completed');
 
     logger.info({ 
       bookingId, 
@@ -157,18 +199,27 @@ export async function processSingleBookingData(bookingData: any): Promise<{
       phone: result.phone,
       status: result.status,
       bdStatus: result.BDStatus
-    }, '✅ Successfully synced to BD - Booking table');
-    return { success: true, action: existing ? 'updated' : 'created', table: 'Booking' };
+    }, '🎉 PROCESS STEP 10: Successfully synced to BD - Booking table');
+    
+    const finalResult = { success: true, action: existing ? 'updated' : 'created', table: 'Booking' } as const;
+    logger.info({ bookingId, finalResult }, '🏁 PROCESS STEP 11: Returning success result');
+    
+    return finalResult;
 
   } catch (error: any) {
+    const bookingId = (bookingData?.bookingId || bookingData?.id)?.toString() || 'unknown';
     logger.error({ 
+      bookingId,
       error: error.message, 
       stack: error.stack,
-      bookingId: bookingData.bookingId || bookingData.id,
       data: bookingData,
       constraint: error.code === 'P2002' ? 'unique_constraint' : error.code
-    }, '❌ Failed to sync to BD - check constraints and data');
-    return { success: false, action: 'skipped', table: 'Booking' };
+    }, '💥 PROCESS ERROR: Failed to sync to BD - check constraints and data');
+    
+    const errorResult = { success: false, action: 'skipped', table: 'Booking' } as const;
+    logger.info({ bookingId, errorResult }, '🚫 PROCESS STEP 12: Returning error result');
+    
+    return errorResult;
   }
 }
 

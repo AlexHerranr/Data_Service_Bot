@@ -47,7 +47,9 @@
       "Bash(railway redeploy:*)",
       "Bash(railway connect:*)",
       "Bash(railway service:*)",
-      "Bash(npx prisma:*)"
+      "Bash(npx prisma:*)",
+      "Bash(PRISMA_CLIENT_OUTPUT=./node_modules/.prisma/client node ../temp-check-bookings.js)",
+      "Bash(rg:*)"
     ],
     "defaultMode": "acceptEdits"
   }
