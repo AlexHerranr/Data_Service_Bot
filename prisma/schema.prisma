@@ -74,6 +74,8 @@ model Booking {
   @@index([status])
 }
 
+// Force Prisma client regeneration - removed leadType constraint
+
 model Leads {
   id               Int       @id @default(autoincrement())
   bookingId        String?   @unique

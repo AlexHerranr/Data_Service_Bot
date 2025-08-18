@@ -10,15 +10,17 @@ const loggerOptions = {
     },
     base: {},
     redact: ['payload.*.token', 'payload.*.password', '*.token', '*.password'],
-    transport: {
-        target: 'pino-pretty',
-        options: {
-            colorize: !isProduction,
-            ignore: 'pid,hostname,time',
-            messageFormat: '{msg}{if bookingId} bookingId={bookingId}{end}{if action} action={action}{end}{if jobId} jobId={jobId}{end}',
-            translateTime: 'HH:MM:ss.l',
-            singleLine: true
+    ...(isProduction ? {} : {
+        transport: {
+            target: 'pino-pretty',
+            options: {
+                colorize: !isProduction,
+                ignore: 'pid,hostname,time',
+                messageFormat: '{msg}{if bookingId} bookingId={bookingId}{end}{if action} action={action}{end}{if jobId} jobId={jobId}{end}',
+                translateTime: 'HH:MM:ss.l',
+                singleLine: true
+            }
         }
-    }
+    })
 };
 export const logger = pino(loggerOptions);
