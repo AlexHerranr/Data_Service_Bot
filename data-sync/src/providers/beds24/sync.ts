@@ -41,7 +41,7 @@ export interface LeadsAndConfirmedResult {
  */
 export async function syncSingleBooking(bookingId: string): Promise<{
   success: boolean;
-  action: 'created' | 'updated' | 'skipped';
+  action: 'created' | 'updated' | 'skipped' | 'skipped-recent';
   table: 'Booking' | 'Leads' | 'ReservationsCancelled';
 }> {
   try {
