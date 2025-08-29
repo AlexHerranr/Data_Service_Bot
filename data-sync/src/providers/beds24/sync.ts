@@ -208,12 +208,16 @@ export async function processSingleBookingData(bookingData: any): Promise<{
       },
     });
     
+    // 🔍 LOG DETALLADO DE CONFIRMACIÓN DE BD
+    const dbAction = existing ? 'ACTUALIZADA' : 'CREADA';
     logger.info({ 
       bookingId, 
       dbResultId: result.id,
-      wasCreated: !existing
-    }, '✅ PROCESS STEP 9: Database upsert completed');
+      wasCreated: !existing,
+      dbAction
+    }, `✅ PROCESS STEP 9: Database upsert completed - Reserva ${dbAction}`);
 
+    // 📊 LOG CON DATOS COMPLETOS PARA VERIFICACIÓN
     logger.info({ 
       bookingId, 
       action: existing ? 'updated' : 'created',
@@ -222,8 +226,25 @@ export async function processSingleBookingData(bookingData: any): Promise<{
       guestName: result.guestName,
       phone: result.phone,
       status: result.status,
-      bdStatus: result.BDStatus
+      bdStatus: result.BDStatus,
+      propertyName: result.propertyName,
+      arrivalDate: result.arrivalDate,
+      departureDate: result.departureDate,
+      totalCharges: result.totalCharges,
+      lastUpdatedBD: result.lastUpdatedBD
     }, '🎉 PROCESS STEP 10: Successfully synced to BD - Booking table');
+    
+    // 🚨 LOG CRÍTICO DE CONFIRMACIÓN (FÁCIL DE BUSCAR EN LOGS)
+    logger.warn({ 
+      '⭐ RESERVA_GUARDADA_EN_BD': true,
+      bookingId,
+      dbId: result.id,
+      action: dbAction,
+      guestName: result.guestName,
+      property: result.propertyName,
+      dates: `${result.arrivalDate} to ${result.departureDate}`,
+      timestamp: new Date().toISOString()
+    }, `✅✅✅ CONFIRMACIÓN BD: Reserva ${bookingId} ${dbAction} exitosamente - Guest: ${result.guestName}`);
     
     const finalResult = { success: true, action: existing ? 'updated' : 'created', table: 'Booking' } as const;
     logger.info({ bookingId, finalResult }, '🏁 PROCESS STEP 11: Returning success result');

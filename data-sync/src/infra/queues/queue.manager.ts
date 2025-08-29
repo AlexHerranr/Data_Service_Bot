@@ -135,11 +135,23 @@ export const beds24Worker = new Worker<JobData>(
         logger.info({ jobId: job.id }, '📊 STEP 12: Recording metrics');
         metricsHelpers.recordJobComplete(data.type, startTime, 'success');
         
+        // 🎯 LOG FINAL DE CONFIRMACIÓN DEL PROCESO COMPLETO
+        const processingTime = Date.now() - startTime;
+        logger.warn({
+          '🏆 PROCESO_COMPLETO': true,
+          jobId: job.id,
+          bookingId,
+          syncResult: syncResult.action,
+          processingTimeMs: processingTime,
+          processingTimeSec: (processingTime / 1000).toFixed(2),
+          timestamp: new Date().toISOString()
+        }, `🎉🎉🎉 ÉXITO TOTAL: Reserva ${bookingId} procesada completamente en ${(processingTime / 1000).toFixed(2)}s`);
+        
         logger.info({ 
           jobId: job.id, 
           bookingId,
           action,
-          duration: Date.now() - startTime
+          duration: processingTime
         }, '🎉 STEP 13: Beds24 webhook job completed successfully');
         
       } else if (data.type === 'single') {
