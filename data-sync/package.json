@@ -28,6 +28,9 @@
     "update:messages:specific": "tsx scripts/update-all-messages.ts",
     "test:railway-token": "tsx scripts/test-railway-token.ts",
     "create:test-booking": "tsx scripts/create-test-booking.ts",
+    "sync:all-bookings": "node dist/scripts/sync-all-bookings.js",
+    "sync:modified": "node dist/scripts/update-modified-bookings.js",
+    "sync:quick": "node dist/scripts/update-modified-bookings.js 2",
     "typecheck": "npx tsc --noEmit",
     "test-build": "npm run typecheck && npm run build"
   },
