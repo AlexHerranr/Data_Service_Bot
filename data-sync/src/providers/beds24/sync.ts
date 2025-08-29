@@ -18,6 +18,7 @@ import {
   extractMessages,
   mapPropertyName
 } from './utils.js';
+import { validateBookingData, isValidBooking } from './validators.js';
 import { prisma } from '../../infra/db/prisma.client.js';
 import { logger } from '../../utils/logger.js';
 
@@ -159,6 +160,23 @@ export async function processSingleBookingData(bookingData: any): Promise<{
       commonData.messages = extractMessages(bookingData);
       logger.debug({ bookingId, messageCount: commonData.messages?.length || 0 }, 'Enhanced message extraction for MODIFY action');
     }
+    
+    // Validate all data before saving
+    const validatedData = validateBookingData(commonData);
+    const validation = isValidBooking(validatedData);
+    
+    if (!validation.valid) {
+      logger.error({ 
+        bookingId, 
+        errors: validation.errors,
+        data: validatedData 
+      }, '❌ PROCESS STEP 5.1: Booking data validation failed');
+      
+      // Still try to save with validated data, but log the issues
+      logger.warn({ bookingId }, 'Attempting to save despite validation errors');
+    } else {
+      logger.info({ bookingId }, '✅ PROCESS STEP 5.2: Booking data validation passed');
+    }
 
     logger.info({ bookingId }, '🔍 PROCESS STEP 6: Checking if booking exists in BD');
     
@@ -177,9 +195,9 @@ export async function processSingleBookingData(bookingData: any): Promise<{
     
     const result = await prisma.booking.upsert({
       where: { bookingId },
-      create: commonData,
+      create: validatedData,
       update: {
-        ...commonData,
+        ...validatedData,
         id: undefined, // Don't update ID
       },
     });

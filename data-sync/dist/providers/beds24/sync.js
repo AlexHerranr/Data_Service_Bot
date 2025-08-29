@@ -1,5 +1,6 @@
 import { getBeds24Client } from './client.js';
 import { formatDateSimple, extractChargesAndPayments, extractInfoItems, calculateNights, determineBDStatus, shouldSyncAsLead, shouldSyncAsConfirmed, extractGuestName, extractPhoneNumber, extractEmail, combineNotes, calculateTotalPersons, determineChannel, extractMessages, mapPropertyName } from './utils.js';
+import { validateBookingData, isValidBooking } from './validators.js';
 import { prisma } from '../../infra/db/prisma.client.js';
 import { logger } from '../../utils/logger.js';
 export async function syncSingleBooking(bookingId) {
@@ -89,6 +90,19 @@ export async function processSingleBookingData(bookingData) {
             commonData.messages = extractMessages(bookingData);
             logger.debug({ bookingId, messageCount: commonData.messages?.length || 0 }, 'Enhanced message extraction for MODIFY action');
         }
+        const validatedData = validateBookingData(commonData);
+        const validation = isValidBooking(validatedData);
+        if (!validation.valid) {
+            logger.error({
+                bookingId,
+                errors: validation.errors,
+                data: validatedData
+            }, '❌ PROCESS STEP 5.1: Booking data validation failed');
+            logger.warn({ bookingId }, 'Attempting to save despite validation errors');
+        }
+        else {
+            logger.info({ bookingId }, '✅ PROCESS STEP 5.2: Booking data validation passed');
+        }
         logger.info({ bookingId }, '🔍 PROCESS STEP 6: Checking if booking exists in BD');
         const existing = await prisma.booking.findUnique({
             where: { bookingId }
@@ -101,9 +115,9 @@ export async function processSingleBookingData(bookingData) {
         logger.info({ bookingId }, '💾 PROCESS STEP 8: Starting database upsert operation');
         const result = await prisma.booking.upsert({
             where: { bookingId },
-            create: commonData,
+            create: validatedData,
             update: {
-                ...commonData,
+                ...validatedData,
                 id: undefined,
             },
         });
