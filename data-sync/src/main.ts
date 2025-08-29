@@ -53,17 +53,27 @@ async function main() {
   
   let totalRemoved = 0;
   
-  // Remove ALL delayed jobs (they're from previous runs)
+  // Remove delayed jobs older than 5 minutes (they're likely from previous runs)
   const delayedJobs = await beds24Queue.getDelayed();
   for (const job of delayedJobs) {
     const jobAge = Date.now() - job.timestamp;
-    await job.remove();
-    totalRemoved++;
-    logger.info({ 
-      jobId: job.id, 
-      age: Math.floor(jobAge / 1000) + 's',
-      type: 'delayed'
-    }, `Removed delayed job: ${job.id}`);
+    // Only remove if older than 5 minutes (our max delay is 1 minute)
+    if (jobAge > 5 * 60 * 1000) {
+      await job.remove();
+      totalRemoved++;
+      logger.info({ 
+        jobId: job.id, 
+        age: Math.floor(jobAge / 1000) + 's',
+        type: 'delayed'
+      }, `Removed old delayed job: ${job.id}`);
+    } else {
+      logger.info({ 
+        jobId: job.id, 
+        age: Math.floor(jobAge / 1000) + 's',
+        type: 'delayed',
+        kept: true
+      }, `Kept recent delayed job: ${job.id}`);
+    }
   }
   
   // Remove waiting jobs older than 2 minutes
@@ -107,16 +117,43 @@ async function main() {
   
   // Initialize BullMQ worker
   logger.info('🔄 Starting BullMQ worker...');
-  // Worker is already initialized by importing from queue.manager.js
+  const { beds24Worker } = await import('./infra/queues/queue.manager.js');
+  
+  // Ensure worker is running
+  if (!beds24Worker.isRunning()) {
+    await beds24Worker.run();
+    logger.warn('Worker was not running, started it manually');
+  }
+  
   logger.info('✅ BullMQ worker started successfully');
+  
+  // Process any delayed jobs that should have already run
+  const delayedJobsToProcess = await beds24Queue.getDelayed();
+  for (const job of delayedJobsToProcess) {
+    const delayedUntil = await job.getDelayedTime();
+    if (delayedUntil && delayedUntil <= Date.now()) {
+      // This job should have already been processed
+      await job.promote();
+      logger.warn({ 
+        jobId: job.id,
+        delayedUntil: new Date(delayedUntil).toISOString(),
+        now: new Date().toISOString()
+      }, 'Promoted overdue delayed job to waiting queue');
+    }
+  }
   
   // Debug: Check worker status every 30 seconds
   setInterval(async () => {
-    const { beds24Queue } = await import('./infra/queues/queue.manager.js');
+    const { beds24Queue, beds24Worker } = await import('./infra/queues/queue.manager.js');
     const waiting = await beds24Queue.getWaitingCount();
     const active = await beds24Queue.getActiveCount();
     const completed = await beds24Queue.getCompletedCount();
     const failed = await beds24Queue.getFailedCount();
+    const delayed = await beds24Queue.getDelayedCount();
+    
+    // Check worker status
+    const isRunning = beds24Worker.isRunning();
+    const isPaused = await beds24Worker.isPaused();
     
     logger.info({
       event: 'QUEUE_STATUS_CHECK',
@@ -124,8 +161,11 @@ async function main() {
       active,
       completed,
       failed,
+      delayed,
+      workerRunning: isRunning,
+      workerPaused: isPaused,
       timestamp: new Date().toISOString()
-    }, `Queue status - Waiting: ${waiting}, Active: ${active}, Completed: ${completed}, Failed: ${failed}`);
+    }, `Queue status - Waiting: ${waiting}, Active: ${active}, Delayed: ${delayed}, Completed: ${completed}, Failed: ${failed} | Worker: ${isRunning ? 'Running' : 'Stopped'} ${isPaused ? '(Paused)' : ''}`);
   }, 30000);
   
   // Routes
