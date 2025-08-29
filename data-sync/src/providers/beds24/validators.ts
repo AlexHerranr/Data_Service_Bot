@@ -242,10 +242,6 @@ export function validateBookingData(data: any): any {
     }
   }, 'Booking data validation completed');
   
-  // leadType - Agregar campo por defecto para evitar errores de constraint
-  // Este campo parece ser requerido por algún trigger o constraint en la BD
-  (validated as any).leadType = data.leadType || 'booking';
-  
   return validated;
 }
 

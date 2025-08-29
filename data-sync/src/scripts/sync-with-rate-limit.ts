@@ -215,8 +215,12 @@ export async function syncWithRateLimit(): Promise<SyncStats> {
         try {
           const bookingData = transformBookingData(booking);
           
+          // Agregar leadType con valor por defecto
           await prisma.booking.create({
-            data: bookingData
+            data: {
+              ...bookingData,
+              leadType: 'booking'
+            } as any
           });
           
           stats.created++;
@@ -258,8 +262,9 @@ export async function syncWithRateLimit(): Promise<SyncStats> {
               where: { bookingId },
               data: {
                 ...bookingData,
-                bookingId: undefined
-              }
+                bookingId: undefined,
+                leadType: 'booking'
+              } as any
             });
             
             stats.updated++;
