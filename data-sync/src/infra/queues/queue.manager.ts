@@ -333,23 +333,54 @@ export async function addWebhookJob(
     }
   }
 
-  const job = await beds24Queue.add('webhook', jobData, {
-    priority: 1, // Alta prioridad para webhooks
-    jobId, // Usar jobId único para deduplicación
-    ...options,
-  });
-  
-  logger.info({ 
-    jobId: job.id,
-    bookingId: jobData.bookingId || jobData.payload?.id,
-    action: jobData.action || jobData.payload?.action,
+  // Log BEFORE adding to queue
+  logger.warn({
+    event: 'ADDING_JOB_TO_QUEUE',
+    jobId: jobId,
+    bookingId: data.bookingId,
+    queueName: 'beds24-sync',
     delay: options?.delay || 0,
-    delayMinutes: options?.delay ? (options.delay / 60000).toFixed(2) : 0,
-    scheduledFor: options?.delay ? new Date(Date.now() + options.delay).toISOString() : 'immediate',
-    delayReason: jobData.delayReason || 'none'
-  }, 'Webhook job queued');
+    timestamp: new Date().toISOString()
+  }, `ADDING job ${jobId} to queue with delay ${options?.delay || 0}ms`);
   
-  return job;
+  try {
+    const job = await beds24Queue.add('webhook', jobData, {
+      priority: 1, // Alta prioridad para webhooks
+      jobId, // Usar jobId único para deduplicación
+      ...options,
+    });
+    
+    // Log AFTER adding to queue
+    logger.warn({
+      event: 'JOB_ADDED_TO_QUEUE',
+      jobId: job.id,
+      jobName: job.name,
+      queueName: job.queueName,
+      delay: job.opts.delay || 0,
+      timestamp: new Date().toISOString()
+    }, `JOB ADDED: ${job.id} to queue ${job.queueName}`);
+    
+    logger.info({ 
+      jobId: job.id,
+      bookingId: jobData.bookingId || jobData.payload?.id,
+      action: jobData.action || jobData.payload?.action,
+      delay: options?.delay || 0,
+      delayMinutes: options?.delay ? (options.delay / 60000).toFixed(2) : 0,
+      scheduledFor: options?.delay ? new Date(Date.now() + options.delay).toISOString() : 'immediate',
+      delayReason: jobData.delayReason || 'none'
+    }, 'Webhook job queued');
+    
+    return job;
+  } catch (error: any) {
+    logger.error({
+      event: 'JOB_ADD_FAILED',
+      jobId: jobId,
+      error: error.message,
+      stack: error.stack,
+      timestamp: new Date().toISOString()
+    }, `FAILED to add job ${jobId}: ${error.message}`);
+    throw error;
+  }
 }
 
 export async function addSingleSyncJob(
