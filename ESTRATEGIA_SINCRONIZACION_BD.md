@@ -1,5 +1,7 @@
 # 📊 Estrategia de Sincronización de Base de Datos
 
+⚠️ **ACTUALIZADO**: Diciembre 2024 - Sistema funcionando sin campo `leadType`
+
 ## 🎯 Objetivo
 Sincronizar todas las reservas de Beds24 (período: 1 Ago 2025 - 1 Ago 2026) de manera inteligente, evitando duplicados y optimizando el proceso.
 
@@ -73,19 +75,31 @@ Sincronizar todas las reservas de Beds24 (período: 1 Ago 2025 - 1 Ago 2026) de 
 
 ## 🚀 Scripts de Ejecución
 
-### 1. Sincronización Completa (Primera vez o mensual)
+### 1. ✅ Sincronización Inteligente (RECOMENDADO)
 ```bash
-# Ejecuta las 4 fases completas
-npm run sync:all-bookings
+# Maneja rate limits automáticamente
+npm run sync:smart
 ```
 
-**Tiempo estimado**: 10-30 minutos
-**Cuándo usar**: 
-- Primera sincronización
-- Sincronización mensual completa
-- Después de problemas de conectividad
+**Características**:
+- ✅ Maneja rate limits automáticamente (espera 6 min si necesario)
+- ✅ Descarga todo en una sola llamada API
+- ✅ Procesa localmente para minimizar requests
+- ✅ Reintentos automáticos en caso de error
 
-### 2. Actualización Rápida (Diaria o por hora)
+**Tiempo estimado**: 2-5 minutos (más si hay rate limit)
+**Cuándo usar**: SIEMPRE - es la opción más segura
+
+### 2. Sincronización Completa Básica
+```bash
+# Sin manejo automático de rate limits
+npm run sync:complete
+```
+
+**Tiempo estimado**: 2-5 minutos
+**Cuándo usar**: Solo para pruebas rápidas
+
+### 3. Actualización Rápida (Modificaciones recientes)
 ```bash
 # Solo actualiza modificadas en últimas 24 horas
 npm run sync:modified
