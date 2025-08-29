@@ -2,36 +2,53 @@
 
 ## 🎯 Objetivo
 Implementar un sistema de colas inteligente para los webhooks de Beds24:
-- **Reservas nuevas (CREATED)**: Procesamiento inmediato
-- **Modificaciones (MODIFY)**: Delay de 3 minutos para agrupar cambios múltiples
-- **Cancelaciones (CANCEL)**: Procesamiento inmediato
+- **Reservas nuevas (CREATED)**: Procesamiento inmediato ✅
+- **Cancelaciones (CANCEL)**: Procesamiento inmediato ✅
+- **Modificaciones con mensajes (MODIFY + messages)**: Procesamiento inmediato 💬
+- **Modificaciones de datos (MODIFY sin messages)**: Delay de 3 minutos para agrupar cambios ⏰
 
 ## 🔧 Archivos Modificados
 
 ### 1. `/data-sync/src/server/routes/webhooks/beds24.route.ts`
 **Cambios principales:**
-- Añadida lógica para determinar el delay basado en la acción del webhook
-- Para `MODIFY`: se programa con delay de 180000ms (3 minutos)
+- Añadida lógica inteligente para determinar el delay basado en la acción Y contenido del webhook
+- Para `MODIFY con mensajes`: procesamiento inmediato (mensajes del chat necesitan respuesta rápida)
+- Para `MODIFY sin mensajes`: delay de 180000ms (3 minutos) para agrupar modificaciones de datos
 - Para `CREATED` y `CANCEL`: procesamiento inmediato
-- Logs detallados con información del delay y tiempo programado
+- Detección automática de mensajes en el payload
+- Logs detallados con información del delay, tipo de modificación y tiempo programado
 
 ```typescript
-// Determinar el delay basado en la acción
+// Detectar si es una modificación con mensajes nuevos
+const hasMessages = payload.messages && Array.isArray(payload.messages) && payload.messages.length > 0;
+const isMessageUpdate = action === 'MODIFY' && hasMessages;
+
+// Determinar el delay basado en la acción y contenido
 let jobDelay = 0; // Por defecto sin delay
 let delayReason = 'immediate';
 
 if (action === 'MODIFY') {
-  // Para modificaciones, esperar 3 minutos (180000 ms)
-  jobDelay = 180000; // 3 minutos en milisegundos
-  delayReason = '3-minute-delay-for-modifications';
-  
-  logger.info({ 
-    bookingId, 
-    action,
-    delayMinutes: 3,
-    delayMs: jobDelay,
-    scheduledFor: new Date(Date.now() + jobDelay).toISOString()
-  }, '⏰ MODIFY webhook scheduled for 3 minutes delay');
+  if (isMessageUpdate) {
+    // Si es una modificación con mensajes, procesar inmediatamente
+    jobDelay = 0;
+    delayReason = 'immediate-message-update';
+    
+    logger.info({ 
+      bookingId, 
+      messageCount: payload.messages?.length || 0,
+      lastMessageSource: payload.messages?.[payload.messages.length - 1]?.source || 'unknown'
+    }, '💬 MODIFY with messages - processing immediately');
+  } else {
+    // Para otras modificaciones (precio, estado, etc), esperar 3 minutos
+    jobDelay = 180000; // 3 minutos en milisegundos
+    delayReason = '3-minute-delay-for-data-modifications';
+    
+    logger.info({ 
+      bookingId, 
+      delayMinutes: 3,
+      scheduledFor: new Date(Date.now() + jobDelay).toISOString()
+    }, '⏰ MODIFY without messages - scheduled for 3 minutes delay');
+  }
 }
 ```
 
@@ -92,10 +109,12 @@ logger.info({
 
 Los nuevos logs permiten rastrear:
 1. **Cuándo se recibe el webhook** y qué acción tiene
-2. **Si se programa con delay** y cuánto tiempo
-3. **Cuándo se procesa realmente** el job
-4. **El delay real vs el programado**
-5. **Si se cancela un job anterior** por una nueva modificación
+2. **Si contiene mensajes nuevos** y cuántos
+3. **Si se programa con delay** y cuánto tiempo
+4. **Cuándo se procesa realmente** el job
+5. **El delay real vs el programado**
+6. **Si se cancela un job anterior** por una nueva modificación
+7. **Tipo de modificación** (mensaje vs datos)
 
 ## 🧪 Script de Prueba
 
@@ -120,14 +139,16 @@ docker logs -f data-sync-app-1 2>&1 | grep -E "webhook|delay|MODIFY|CREATED"
 ```
 
 2. **Buscar estos mensajes clave:**
-- `⏰ MODIFY webhook scheduled for 3 minutes delay` - Cuando se programa una modificación
+- `💬 MODIFY with messages - processing immediately` - Modificación con mensajes nuevos
+- `⏰ MODIFY without messages - scheduled for 3 minutes delay` - Modificación de datos sin mensajes
 - `🚀 CREATED webhook will be processed immediately` - Para reservas nuevas
 - `❌ CANCEL webhook will be processed immediately` - Para cancelaciones
 - `Cancelling existing job and scheduling new MODIFY with delay` - Cuando se reemplaza una modificación
 
 3. **Verificar en la BD de Railway:**
 - Las reservas nuevas deben aparecer inmediatamente
-- Las modificaciones deben actualizarse ~3 minutos después del webhook
+- Los mensajes nuevos deben guardarse inmediatamente
+- Las modificaciones de datos (precio, fechas, etc.) deben actualizarse ~3 minutos después
 - Las cancelaciones deben marcarse como canceladas inmediatamente
 
 ## 🚀 Próximos Pasos

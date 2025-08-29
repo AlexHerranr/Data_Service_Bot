@@ -46,18 +46,34 @@ export function registerBeds24Webhook(router) {
                 payload: payload
             }, 'Beds24 webhook received');
             metricsHelpers.recordWebhook('beds24', action.toLowerCase());
+            const hasMessages = payload.messages && Array.isArray(payload.messages) && payload.messages.length > 0;
+            const isMessageUpdate = action === 'MODIFY' && hasMessages;
             let jobDelay = 0;
             let delayReason = 'immediate';
             if (action === 'MODIFY') {
-                jobDelay = 180000;
-                delayReason = '3-minute-delay-for-modifications';
-                logger.info({
-                    bookingId,
-                    action,
-                    delayMinutes: 3,
-                    delayMs: jobDelay,
-                    scheduledFor: new Date(Date.now() + jobDelay).toISOString()
-                }, '⏰ MODIFY webhook scheduled for 3 minutes delay');
+                if (isMessageUpdate) {
+                    jobDelay = 0;
+                    delayReason = 'immediate-message-update';
+                    logger.info({
+                        bookingId,
+                        action,
+                        messageCount: payload.messages?.length || 0,
+                        lastMessage: payload.messages?.[payload.messages.length - 1]?.message?.substring(0, 50) || 'N/A',
+                        lastMessageSource: payload.messages?.[payload.messages.length - 1]?.source || 'unknown'
+                    }, '💬 MODIFY with messages - processing immediately');
+                }
+                else {
+                    jobDelay = 180000;
+                    delayReason = '3-minute-delay-for-data-modifications';
+                    logger.info({
+                        bookingId,
+                        action,
+                        delayMinutes: 3,
+                        delayMs: jobDelay,
+                        scheduledFor: new Date(Date.now() + jobDelay).toISOString(),
+                        modificationType: 'data-update'
+                    }, '⏰ MODIFY without messages - scheduled for 3 minutes delay');
+                }
             }
             else if (action === 'CREATED') {
                 logger.info({

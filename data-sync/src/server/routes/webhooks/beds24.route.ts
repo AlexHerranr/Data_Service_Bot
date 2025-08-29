@@ -63,22 +63,41 @@ export function registerBeds24Webhook(router: Router): void {
       // Record webhook metrics
       metricsHelpers.recordWebhook('beds24', action.toLowerCase());
 
-      // Determinar el delay basado en la acción
+      // Detectar si es una modificación con mensajes nuevos
+      const hasMessages = payload.messages && Array.isArray(payload.messages) && payload.messages.length > 0;
+      const isMessageUpdate = action === 'MODIFY' && hasMessages;
+      
+      // Determinar el delay basado en la acción y contenido
       let jobDelay = 0; // Por defecto sin delay
       let delayReason = 'immediate';
       
       if (action === 'MODIFY') {
-        // Para modificaciones, esperar 3 minutos (180000 ms)
-        jobDelay = 180000; // 3 minutos en milisegundos
-        delayReason = '3-minute-delay-for-modifications';
-        
-        logger.info({ 
-          bookingId, 
-          action,
-          delayMinutes: 3,
-          delayMs: jobDelay,
-          scheduledFor: new Date(Date.now() + jobDelay).toISOString()
-        }, '⏰ MODIFY webhook scheduled for 3 minutes delay');
+        if (isMessageUpdate) {
+          // Si es una modificación con mensajes, procesar inmediatamente
+          jobDelay = 0;
+          delayReason = 'immediate-message-update';
+          
+          logger.info({ 
+            bookingId, 
+            action,
+            messageCount: payload.messages?.length || 0,
+            lastMessage: payload.messages?.[payload.messages.length - 1]?.message?.substring(0, 50) || 'N/A',
+            lastMessageSource: payload.messages?.[payload.messages.length - 1]?.source || 'unknown'
+          }, '💬 MODIFY with messages - processing immediately');
+        } else {
+          // Para otras modificaciones (precio, estado, etc), esperar 3 minutos
+          jobDelay = 180000; // 3 minutos en milisegundos
+          delayReason = '3-minute-delay-for-data-modifications';
+          
+          logger.info({ 
+            bookingId, 
+            action,
+            delayMinutes: 3,
+            delayMs: jobDelay,
+            scheduledFor: new Date(Date.now() + jobDelay).toISOString(),
+            modificationType: 'data-update'
+          }, '⏰ MODIFY without messages - scheduled for 3 minutes delay');
+        }
       } else if (action === 'CREATED') {
         // Para nuevas reservas, procesar inmediatamente
         logger.info({ 
