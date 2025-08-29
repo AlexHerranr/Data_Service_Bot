@@ -118,7 +118,9 @@ export const beds24Worker = new Worker<JobData>(
         
         logger.info({ jobId: job.id, bookingId }, '📡 STEP 8: Calling syncSingleBooking function');
         
-        const syncResult = await syncSingleBooking(bookingId);
+        // Pass webhook payload as fallback if API doesn't have the booking yet
+        const webhookPayload = webhookData.payload?.fullPayload?.booking || webhookData.payload;
+        const syncResult = await syncSingleBooking(bookingId, webhookPayload);
         
         logger.info({ 
           jobId: job.id, 
@@ -130,13 +132,23 @@ export const beds24Worker = new Worker<JobData>(
         }, '📋 STEP 9: syncSingleBooking completed');
         
         // ✅ VERIFICAR SUCCESS antes de marcar como completado
-        if (!syncResult.success) {
+        // Note: 'skipped' is not an error, it's a valid result
+        if (!syncResult.success && syncResult.action !== 'skipped' && syncResult.action !== 'skipped-recent') {
           logger.error({ 
             jobId: job.id, 
             bookingId, 
             syncResult 
           }, '❌ STEP 9.1: Sync failed, will throw error');
           throw new Error(`Sync failed: ${syncResult.action} - ${syncResult.table}`);
+        }
+        
+        // Log skipped bookings as warnings, not errors
+        if (syncResult.action === 'skipped' || syncResult.action === 'skipped-recent') {
+          logger.warn({ 
+            jobId: job.id, 
+            bookingId, 
+            syncResult 
+          }, '⚠️ STEP 9.2: Booking was skipped (not an error)');
         }
         
         logger.info({ jobId: job.id, bookingId }, '✅ STEP 10: Sync success verified');

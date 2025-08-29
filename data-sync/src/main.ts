@@ -48,26 +48,61 @@ async function main() {
   }
 
   // Clean old jobs before starting worker
-  logger.info('🧹 Cleaning old jobs from queue...');
+  logger.info('🧺 Cleaning old jobs from queue...');
   const { beds24Queue } = await import('./infra/queues/queue.manager.js');
   
-  // Remove all delayed jobs older than 5 minutes
+  let totalRemoved = 0;
+  
+  // Remove ALL delayed jobs (they're from previous runs)
   const delayedJobs = await beds24Queue.getDelayed();
-  let removedCount = 0;
   for (const job of delayedJobs) {
     const jobAge = Date.now() - job.timestamp;
-    if (jobAge > 5 * 60 * 1000) { // Older than 5 minutes
+    await job.remove();
+    totalRemoved++;
+    logger.info({ 
+      jobId: job.id, 
+      age: Math.floor(jobAge / 1000) + 's',
+      type: 'delayed'
+    }, `Removed delayed job: ${job.id}`);
+  }
+  
+  // Remove waiting jobs older than 2 minutes
+  const waitingJobs = await beds24Queue.getWaiting();
+  for (const job of waitingJobs) {
+    const jobAge = Date.now() - job.timestamp;
+    if (jobAge > 2 * 60 * 1000) { // Older than 2 minutes
       await job.remove();
-      removedCount++;
+      totalRemoved++;
       logger.info({ 
         jobId: job.id, 
-        age: Math.floor(jobAge / 1000) + 's' 
-      }, `Removed old delayed job: ${job.id}`);
+        age: Math.floor(jobAge / 1000) + 's',
+        type: 'waiting' 
+      }, `Removed old waiting job: ${job.id}`);
     }
   }
   
-  if (removedCount > 0) {
-    logger.info({ count: removedCount }, `Cleaned ${removedCount} old delayed jobs`);
+  // Clean failed jobs older than 10 minutes
+  const failedJobs = await beds24Queue.getFailed();
+  for (const job of failedJobs) {
+    const jobAge = Date.now() - job.timestamp;
+    if (jobAge > 10 * 60 * 1000) { // Older than 10 minutes
+      await job.remove();
+      totalRemoved++;
+      logger.info({ 
+        jobId: job.id, 
+        age: Math.floor(jobAge / 1000) + 's',
+        type: 'failed'
+      }, `Removed old failed job: ${job.id}`);
+    }
+  }
+  
+  if (totalRemoved > 0) {
+    logger.warn({ 
+      count: totalRemoved,
+      delayed: delayedJobs.length,
+      waiting: waitingJobs.filter(j => Date.now() - j.timestamp > 2 * 60 * 1000).length,
+      failed: failedJobs.filter(j => Date.now() - j.timestamp > 10 * 60 * 1000).length
+    }, `🧺 CLEANED ${totalRemoved} old jobs from queue on startup`);
   }
   
   // Initialize BullMQ worker

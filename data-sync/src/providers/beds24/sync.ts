@@ -39,7 +39,7 @@ export interface LeadsAndConfirmedResult {
 /**
  * Sync a single booking by ID - fetches complete data from Beds24 API
  */
-export async function syncSingleBooking(bookingId: string): Promise<{
+export async function syncSingleBooking(bookingId: string, webhookPayload?: any): Promise<{
   success: boolean;
   action: 'created' | 'updated' | 'skipped' | 'skipped-recent';
   table: 'Booking' | 'Leads' | 'ReservationsCancelled';
@@ -59,14 +59,28 @@ export async function syncSingleBooking(bookingId: string): Promise<{
     const client = getBeds24Client();
     
     logger.info({ bookingId }, '📡 SYNC STEP D: Fetching booking from Beds24 API');
-    const bookingData = await client.getBooking(bookingId);
+    let bookingData = await client.getBooking(bookingId);
 
-    if (!bookingData) {
-      logger.warn({ bookingId }, '⚠️ SYNC STEP D.1: Booking not found in Beds24');
-      return { success: false, action: 'skipped', table: 'Booking' };
+    if (!bookingData && webhookPayload) {
+      logger.warn({ bookingId }, '⚠️ SYNC STEP D.1: Booking not found in Beds24 API, using webhook payload');
+      // Use webhook payload if API doesn't have the booking yet (new bookings)
+      bookingData = webhookPayload;
+      logger.info({ 
+        bookingId, 
+        hasWebhookData: true,
+        guestName: bookingData.firstName,
+        status: bookingData.status 
+      }, '📦 SYNC STEP D.2: Using webhook payload data');
+    } else if (!bookingData) {
+      logger.warn({ bookingId }, '⚠️ SYNC STEP D.3: Booking not found and no webhook payload available');
+      return { success: true, action: 'skipped', table: 'Booking' };
     }
 
-    logger.info({ bookingId, hasData: !!bookingData }, '✅ SYNC STEP E: Fetched complete booking data from API');
+    logger.info({ 
+      bookingId, 
+      hasData: !!bookingData,
+      dataSource: bookingData === webhookPayload ? 'webhook' : 'api' 
+    }, '✅ SYNC STEP E: Have booking data');
 
     // Process the complete booking data
     logger.info({ bookingId }, '⚙️ SYNC STEP F: Starting processSingleBookingData');
