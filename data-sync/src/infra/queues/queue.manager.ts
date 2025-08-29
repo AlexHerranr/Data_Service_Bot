@@ -311,26 +311,33 @@ export async function addWebhookJob(
     ...data
   };
   
-  // Deduplicación de jobs - evitar duplicados por bookingId
+  // Deduplicación mejorada - evitar procesar la misma reserva múltiples veces
   const jobId = `beds24-sync-${data.bookingId}`;
-  const existingJob = await beds24Queue.getJob(jobId);
   
-  if (existingJob && !existingJob.isCompleted() && !existingJob.isFailed()) {
-    // Si ya existe un job para esta reserva, verificar si es una modificación
-    if (data.action === 'MODIFY' && options?.delay) {
-      // Si es una modificación con delay, cancelar el job anterior y crear uno nuevo
-      logger.info({ 
-        bookingId: data.bookingId, 
-        existingJobId: existingJob.id,
-        newDelay: options.delay 
-      }, 'Cancelling existing job and scheduling new MODIFY with delay');
-      
-      await existingJob.remove();
-      // Continuar para crear el nuevo job con delay
-    } else {
-      logger.debug({ bookingId: data.bookingId, existingJobId: existingJob.id }, 'Skipping duplicate job');
-      return existingJob;
-    }
+  // Check for existing jobs (waiting, delayed, or active)
+  const [existingJob, delayedJobs, activeJobs] = await Promise.all([
+    beds24Queue.getJob(jobId),
+    beds24Queue.getDelayed(),
+    beds24Queue.getActive()
+  ]);
+  
+  // Check if job is already in delayed queue
+  const existingDelayed = delayedJobs.find(j => j.id === jobId);
+  const existingActive = activeJobs.find(j => j.id === jobId);
+  
+  if (existingDelayed || existingActive || (existingJob && !existingJob.isCompleted() && !existingJob.isFailed())) {
+    logger.warn({ 
+      bookingId: data.bookingId, 
+      existingJobId: jobId,
+      isDelayed: !!existingDelayed,
+      isActive: !!existingActive,
+      isWaiting: !!(existingJob && !existingJob.isCompleted() && !existingJob.isFailed())
+    }, 'Job already exists for this booking - removing old and creating new');
+    
+    // Remove all existing jobs for this booking
+    if (existingDelayed) await existingDelayed.remove();
+    if (existingJob) await existingJob.remove();
+    // Don't remove active jobs - let them complete
   }
 
   // Log BEFORE adding to queue

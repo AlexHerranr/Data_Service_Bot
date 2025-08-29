@@ -191,6 +191,20 @@ export async function processSingleBookingData(bookingData: any): Promise<{
       where: { bookingId }
     });
     
+    // Check if booking was recently updated (within last 2 minutes)
+    if (existing && existing.lastUpdatedBD) {
+      const timeSinceLastUpdate = Date.now() - new Date(existing.lastUpdatedBD).getTime();
+      if (timeSinceLastUpdate < 2 * 60 * 1000) { // Less than 2 minutes
+        logger.warn({ 
+          bookingId,
+          lastUpdatedBD: existing.lastUpdatedBD,
+          secondsSinceUpdate: Math.floor(timeSinceLastUpdate / 1000)
+        }, 'Booking was recently updated - skipping to avoid duplicate processing');
+        
+        return { success: true, action: 'skipped-recent', table: 'Booking' } as const;
+      }
+    }
+    
     logger.info({ 
       bookingId, 
       existsInDB: !!existing,

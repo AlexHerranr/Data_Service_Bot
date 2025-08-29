@@ -47,6 +47,29 @@ async function main() {
     // Continue startup even if Beds24 init fails (READ operations still work)
   }
 
+  // Clean old jobs before starting worker
+  logger.info('🧹 Cleaning old jobs from queue...');
+  const { beds24Queue } = await import('./infra/queues/queue.manager.js');
+  
+  // Remove all delayed jobs older than 5 minutes
+  const delayedJobs = await beds24Queue.getDelayed();
+  let removedCount = 0;
+  for (const job of delayedJobs) {
+    const jobAge = Date.now() - job.timestamp;
+    if (jobAge > 5 * 60 * 1000) { // Older than 5 minutes
+      await job.remove();
+      removedCount++;
+      logger.info({ 
+        jobId: job.id, 
+        age: Math.floor(jobAge / 1000) + 's' 
+      }, `Removed old delayed job: ${job.id}`);
+    }
+  }
+  
+  if (removedCount > 0) {
+    logger.info({ count: removedCount }, `Cleaned ${removedCount} old delayed jobs`);
+  }
+  
   // Initialize BullMQ worker
   logger.info('🔄 Starting BullMQ worker...');
   // Worker is already initialized by importing from queue.manager.js
