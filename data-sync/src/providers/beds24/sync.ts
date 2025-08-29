@@ -41,7 +41,7 @@ export interface LeadsAndConfirmedResult {
  */
 export async function syncSingleBooking(bookingId: string, webhookPayload?: any): Promise<{
   success: boolean;
-  action: 'created' | 'updated' | 'skipped' | 'skipped-recent';
+  action: 'created' | 'updated' | 'skipped';
   table: 'Booking' | 'Leads' | 'ReservationsCancelled';
 }> {
   try {
@@ -72,7 +72,29 @@ export async function syncSingleBooking(bookingId: string, webhookPayload?: any)
         status: bookingData.status 
       }, '📦 SYNC STEP D.2: Using webhook payload data');
     } else if (!bookingData) {
-      logger.warn({ bookingId }, '⚠️ SYNC STEP D.3: Booking not found and no webhook payload available');
+      // Booking not found - might be deleted
+      logger.warn({ bookingId }, '⚠️ SYNC STEP D.3: Booking not found in API and no webhook payload');
+      
+      // Check if it exists in our DB and mark as cancelled/deleted
+      const existingBooking = await prisma.booking.findUnique({
+        where: { bookingId }
+      });
+      
+      if (existingBooking) {
+        // Mark as cancelled if it was in our DB but not in Beds24
+        await prisma.booking.update({
+          where: { bookingId },
+          data: { 
+            status: 'cancelled',
+            BDStatus: 'deleted-from-beds24',
+            modifiedDate: new Date().toISOString(),
+            lastUpdatedBD: new Date()
+          }
+        });
+        logger.info({ bookingId }, '🗑️ SYNC STEP D.4: Marked existing booking as cancelled (deleted from Beds24)');
+        return { success: true, action: 'updated', table: 'Booking' };
+      }
+      
       return { success: true, action: 'skipped', table: 'Booking' };
     }
 
@@ -101,7 +123,7 @@ export async function syncSingleBooking(bookingId: string, webhookPayload?: any)
  */
 export async function processSingleBookingData(bookingData: any): Promise<{
   success: boolean;
-  action: 'created' | 'updated' | 'skipped' | 'skipped-recent';
+  action: 'created' | 'updated' | 'skipped';
   table: 'Booking' | 'Leads' | 'ReservationsCancelled';
 }> {
   try {
@@ -205,19 +227,7 @@ export async function processSingleBookingData(bookingData: any): Promise<{
       where: { bookingId }
     });
     
-    // Check if booking was recently updated (within last 2 minutes)
-    if (existing && existing.lastUpdatedBD) {
-      const timeSinceLastUpdate = Date.now() - new Date(existing.lastUpdatedBD).getTime();
-      if (timeSinceLastUpdate < 2 * 60 * 1000) { // Less than 2 minutes
-        logger.warn({ 
-          bookingId,
-          lastUpdatedBD: existing.lastUpdatedBD,
-          secondsSinceUpdate: Math.floor(timeSinceLastUpdate / 1000)
-        }, 'Booking was recently updated - skipping to avoid duplicate processing');
-        
-        return { success: true, action: 'skipped-recent', table: 'Booking' } as const;
-      }
-    }
+    // Note: Removed 2-minute check - debounce in queue handles duplicate prevention
     
     logger.info({ 
       bookingId, 

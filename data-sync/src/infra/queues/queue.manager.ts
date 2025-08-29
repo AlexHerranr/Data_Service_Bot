@@ -133,7 +133,7 @@ export const beds24Worker = new Worker<JobData>(
         
         // ✅ VERIFICAR SUCCESS antes de marcar como completado
         // Note: 'skipped' is not an error, it's a valid result
-        if (!syncResult.success && syncResult.action !== 'skipped' && syncResult.action !== 'skipped-recent') {
+        if (!syncResult.success && syncResult.action !== 'skipped') {
           logger.error({ 
             jobId: job.id, 
             bookingId, 
@@ -143,7 +143,7 @@ export const beds24Worker = new Worker<JobData>(
         }
         
         // Log skipped bookings as warnings, not errors
-        if (syncResult.action === 'skipped' || syncResult.action === 'skipped-recent') {
+        if (syncResult.action === 'skipped') {
           logger.warn({ 
             jobId: job.id, 
             bookingId, 
@@ -315,41 +315,53 @@ export async function addWebhookJob(
   data: Partial<WebhookJob> | any, 
   options?: QueueJobOptions
 ): Promise<Job> {
-  // Flexible webhook job data
+  // Flexible webhook job data with original timestamp for cleanup
   const jobData = {
     type: 'beds24-webhook',
     timestamp: new Date(),
+    originalTimestamp: new Date().toISOString(), // For cleanup decisions
     priority: 'high' as const,
     ...data
   };
   
-  // Deduplicación mejorada - evitar procesar la misma reserva múltiples veces
+  // REAL DEBOUNCE: One job per booking, rescheduled on each new webhook
   const jobId = `beds24-sync-${data.bookingId}`;
   
-  // Check for existing jobs (waiting, delayed, or active)
-  const [existingJob, delayedJobs, activeJobs] = await Promise.all([
-    beds24Queue.getJob(jobId),
-    beds24Queue.getDelayed(),
-    beds24Queue.getActive()
-  ]);
+  // Check for existing job
+  const existingJob = await beds24Queue.getJob(jobId);
   
-  // Check if job is already in delayed queue
-  const existingDelayed = delayedJobs.find(j => j.id === jobId);
-  const existingActive = activeJobs.find(j => j.id === jobId);
-  
-  if (existingDelayed || existingActive || (existingJob && !existingJob.isCompleted() && !existingJob.isFailed())) {
-    logger.warn({ 
-      bookingId: data.bookingId, 
-      existingJobId: jobId,
-      isDelayed: !!existingDelayed,
-      isActive: !!existingActive,
-      isWaiting: !!(existingJob && !existingJob.isCompleted() && !existingJob.isFailed())
-    }, 'Job already exists for this booking - removing old and creating new');
+  if (existingJob) {
+    const state = await existingJob.getState();
     
-    // Remove all existing jobs for this booking
-    if (existingDelayed) await existingDelayed.remove();
-    if (existingJob) await existingJob.remove();
-    // Don't remove active jobs - let them complete
+    if (state === 'active') {
+      // Job is currently processing - skip this webhook
+      logger.info({
+        event: 'JOB_SKIPPED_ACTIVE',
+        bookingId: data.bookingId,
+        jobId: jobId,
+        state: state,
+        timestamp: new Date().toISOString()
+      }, `Skipping webhook - job ${jobId} is currently active`);
+      return existingJob; // Return existing active job
+    } else if (state === 'delayed' || state === 'waiting') {
+      // Remove old job to reschedule with new delay (debounce)
+      await existingJob.remove();
+      logger.info({
+        event: 'JOB_DEBOUNCED',
+        bookingId: data.bookingId,
+        jobId: jobId,
+        oldState: state,
+        timestamp: new Date().toISOString()
+      }, `Debouncing: removed old ${state} job ${jobId} to reschedule`);
+    } else if (state === 'completed' || state === 'failed') {
+      // Old completed/failed job - can be replaced
+      await existingJob.remove();
+      logger.debug({
+        bookingId: data.bookingId,
+        jobId: jobId,
+        oldState: state
+      }, `Removed old ${state} job`);
+    }
   }
 
   // Log BEFORE adding to queue
