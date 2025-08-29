@@ -20,11 +20,20 @@ export const deadLetterQueue = new Queue('beds24-dlq', { connection: redis });
 export const beds24Worker = new Worker('beds24-sync', async (job) => {
     const { data } = job;
     const startTime = metricsHelpers.recordJobStart(data.type);
+    const jobCreatedAt = new Date(job.timestamp);
+    const jobProcessedAt = new Date();
+    const delayMs = jobProcessedAt.getTime() - jobCreatedAt.getTime();
     logger.info({
         jobId: job.id,
         type: data.type,
         attempt: job.attemptsMade + 1,
-        maxAttempts: job.opts.attempts || 3
+        maxAttempts: job.opts.attempts || 3,
+        createdAt: jobCreatedAt.toISOString(),
+        processedAt: jobProcessedAt.toISOString(),
+        actualDelayMs: delayMs,
+        actualDelayMinutes: (delayMs / 60000).toFixed(2),
+        scheduledDelay: job.opts.delay || 0,
+        delayReason: data.delayReason || 'none'
     }, '🚀 STEP 1: Processing job started');
     logger.info({ jobId: job.id, data }, '📊 STEP 2: Job data received');
     try {
@@ -52,6 +61,18 @@ export const beds24Worker = new Worker('beds24-sync', async (job) => {
             }, '🎯 STEP 6: Processing Beds24 webhook');
             logger.info({ jobId: job.id, bookingId, action }, '🔄 STEP 7: Starting syncSingleBooking call');
             if (action === 'CREATED' || action === 'MODIFY' || action === 'CANCEL') {
+                if (action === 'MODIFY') {
+                    const actualDelay = jobProcessedAt.getTime() - jobCreatedAt.getTime();
+                    logger.info({
+                        jobId: job.id,
+                        bookingId,
+                        action,
+                        actualDelayMs: actualDelay,
+                        actualDelayMinutes: (actualDelay / 60000).toFixed(2),
+                        expectedDelayMinutes: 3,
+                        delayReason: data.delayReason || 'none'
+                    }, '⏱️ MODIFY action being processed after delay');
+                }
                 logger.info({ jobId: job.id, bookingId, action }, '📡 STEP 8: Calling syncSingleBooking function');
                 const syncResult = await syncSingleBooking(bookingId);
                 logger.info({
@@ -215,8 +236,18 @@ export async function addWebhookJob(data, options) {
     const jobId = `beds24-sync-${data.bookingId}`;
     const existingJob = await beds24Queue.getJob(jobId);
     if (existingJob && !existingJob.isCompleted() && !existingJob.isFailed()) {
-        logger.debug({ bookingId: data.bookingId, existingJobId: existingJob.id }, 'Skipping duplicate job');
-        return existingJob;
+        if (data.action === 'MODIFY' && options?.delay) {
+            logger.info({
+                bookingId: data.bookingId,
+                existingJobId: existingJob.id,
+                newDelay: options.delay
+            }, 'Cancelling existing job and scheduling new MODIFY with delay');
+            await existingJob.remove();
+        }
+        else {
+            logger.debug({ bookingId: data.bookingId, existingJobId: existingJob.id }, 'Skipping duplicate job');
+            return existingJob;
+        }
     }
     const job = await beds24Queue.add('webhook', jobData, {
         priority: 1,
@@ -226,7 +257,11 @@ export async function addWebhookJob(data, options) {
     logger.info({
         jobId: job.id,
         bookingId: jobData.bookingId || jobData.payload?.id,
-        action: jobData.action || jobData.payload?.action
+        action: jobData.action || jobData.payload?.action,
+        delay: options?.delay || 0,
+        delayMinutes: options?.delay ? (options.delay / 60000).toFixed(2) : 0,
+        scheduledFor: options?.delay ? new Date(Date.now() + options.delay).toISOString() : 'immediate',
+        delayReason: jobData.delayReason || 'none'
     }, 'Webhook job queued');
     return job;
 }

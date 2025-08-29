@@ -63,7 +63,39 @@ export function registerBeds24Webhook(router: Router): void {
       // Record webhook metrics
       metricsHelpers.recordWebhook('beds24', action.toLowerCase());
 
-      // Encolar job - simple job ID
+      // Determinar el delay basado en la acción
+      let jobDelay = 0; // Por defecto sin delay
+      let delayReason = 'immediate';
+      
+      if (action === 'MODIFY') {
+        // Para modificaciones, esperar 3 minutos (180000 ms)
+        jobDelay = 180000; // 3 minutos en milisegundos
+        delayReason = '3-minute-delay-for-modifications';
+        
+        logger.info({ 
+          bookingId, 
+          action,
+          delayMinutes: 3,
+          delayMs: jobDelay,
+          scheduledFor: new Date(Date.now() + jobDelay).toISOString()
+        }, '⏰ MODIFY webhook scheduled for 3 minutes delay');
+      } else if (action === 'CREATED') {
+        // Para nuevas reservas, procesar inmediatamente
+        logger.info({ 
+          bookingId, 
+          action
+        }, '🚀 CREATED webhook will be processed immediately');
+      } else if (action === 'CANCEL') {
+        // Para cancelaciones, procesar inmediatamente
+        logger.info({ 
+          bookingId, 
+          action
+        }, '❌ CANCEL webhook will be processed immediately');
+      }
+
+      // Encolar job con delay si es necesario
+      const jobOptions = jobDelay > 0 ? { delay: jobDelay } : {};
+      
       const job = await addWebhookJob({
         bookingId: bookingId,
         action: action as any,
@@ -71,14 +103,19 @@ export function registerBeds24Webhook(router: Router): void {
           id: bookingId,
           action: action,
           fullPayload: payload
-        }
-      });
+        },
+        delayReason: delayReason,
+        scheduledFor: jobDelay > 0 ? new Date(Date.now() + jobDelay).toISOString() : null
+      }, jobOptions);
 
       logger.info({ 
         jobId: job.id,
         bookingId, 
-        action
-      }, 'Beds24 webhook job queued');
+        action,
+        delay: jobDelay,
+        delayReason: delayReason,
+        scheduledFor: jobDelay > 0 ? new Date(Date.now() + jobDelay).toISOString() : 'immediate'
+      }, 'Beds24 webhook job queued')
       
     } catch (error: any) {
       logger.error({ 

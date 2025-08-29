@@ -44,11 +44,22 @@ export const beds24Worker = new Worker<JobData>(
     const { data } = job;
     const startTime = metricsHelpers.recordJobStart(data.type);
     
+    // Log detallado del timing del job
+    const jobCreatedAt = new Date(job.timestamp);
+    const jobProcessedAt = new Date();
+    const delayMs = jobProcessedAt.getTime() - jobCreatedAt.getTime();
+    
     logger.info({ 
       jobId: job.id, 
       type: data.type, 
       attempt: job.attemptsMade + 1,
-      maxAttempts: job.opts.attempts || 3
+      maxAttempts: job.opts.attempts || 3,
+      createdAt: jobCreatedAt.toISOString(),
+      processedAt: jobProcessedAt.toISOString(),
+      actualDelayMs: delayMs,
+      actualDelayMinutes: (delayMs / 60000).toFixed(2),
+      scheduledDelay: job.opts.delay || 0,
+      delayReason: (data as any).delayReason || 'none'
     }, '🚀 STEP 1: Processing job started');
     
     logger.info({ jobId: job.id, data }, '📊 STEP 2: Job data received');
@@ -86,6 +97,20 @@ export const beds24Worker = new Worker<JobData>(
 
         // Para CREATED, MODIFY o CANCEL, fetch booking completo y actualizar BD
         if (action === 'CREATED' || action === 'MODIFY' || action === 'CANCEL') {
+          // Log especial para MODIFY con información de timing
+          if (action === 'MODIFY') {
+            const actualDelay = jobProcessedAt.getTime() - jobCreatedAt.getTime();
+            logger.info({ 
+              jobId: job.id, 
+              bookingId, 
+              action,
+              actualDelayMs: actualDelay,
+              actualDelayMinutes: (actualDelay / 60000).toFixed(2),
+              expectedDelayMinutes: 3,
+              delayReason: (data as any).delayReason || 'none'
+            }, '⏱️ MODIFY action being processed after delay');
+          }
+          
           logger.info({ jobId: job.id, bookingId, action }, '📡 STEP 8: Calling syncSingleBooking function');
           
           const syncResult = await syncSingleBooking(bookingId);
@@ -278,8 +303,21 @@ export async function addWebhookJob(
   const existingJob = await beds24Queue.getJob(jobId);
   
   if (existingJob && !existingJob.isCompleted() && !existingJob.isFailed()) {
-    logger.debug({ bookingId: data.bookingId, existingJobId: existingJob.id }, 'Skipping duplicate job');
-    return existingJob;
+    // Si ya existe un job para esta reserva, verificar si es una modificación
+    if (data.action === 'MODIFY' && options?.delay) {
+      // Si es una modificación con delay, cancelar el job anterior y crear uno nuevo
+      logger.info({ 
+        bookingId: data.bookingId, 
+        existingJobId: existingJob.id,
+        newDelay: options.delay 
+      }, 'Cancelling existing job and scheduling new MODIFY with delay');
+      
+      await existingJob.remove();
+      // Continuar para crear el nuevo job con delay
+    } else {
+      logger.debug({ bookingId: data.bookingId, existingJobId: existingJob.id }, 'Skipping duplicate job');
+      return existingJob;
+    }
   }
 
   const job = await beds24Queue.add('webhook', jobData, {
@@ -291,7 +329,11 @@ export async function addWebhookJob(
   logger.info({ 
     jobId: job.id,
     bookingId: jobData.bookingId || jobData.payload?.id,
-    action: jobData.action || jobData.payload?.action
+    action: jobData.action || jobData.payload?.action,
+    delay: options?.delay || 0,
+    delayMinutes: options?.delay ? (options.delay / 60000).toFixed(2) : 0,
+    scheduledFor: options?.delay ? new Date(Date.now() + options.delay).toISOString() : 'immediate',
+    delayReason: jobData.delayReason || 'none'
   }, 'Webhook job queued');
   
   return job;
