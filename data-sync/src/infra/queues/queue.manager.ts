@@ -281,7 +281,8 @@ beds24Worker.on('active', (job) => {
   logger.warn({
     event: 'WORKER_JOB_ACTIVE',
     jobId: job.id,
-    bookingId: job.data.bookingId,
+    bookingId: (job.data as any).bookingId || 'N/A',
+    jobType: job.data.type,
     timestamp: new Date().toISOString()
   }, `WORKER ACTIVE: Job ${job.id} started processing`);
 });
