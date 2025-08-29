@@ -41,6 +41,15 @@ export const deadLetterQueue = new Queue('beds24-dlq', { connection: redis });
 export const beds24Worker = new Worker<JobData>(
   'beds24-sync',
   async (job: Job<JobData>) => {
+    // Critical log to confirm worker is processing
+    logger.warn({
+      event: 'WORKER_PROCESSING_JOB',
+      jobId: job.id,
+      jobName: job.name,
+      data: job.data,
+      timestamp: new Date().toISOString()
+    }, `WORKER ACTIVE: Processing job ${job.id}`);
+    
     const { data } = job;
     const startTime = metricsHelpers.recordJobStart(data.type);
     
@@ -259,7 +268,22 @@ beds24Worker.on('failed', async (job, err) => {
 });
 
 beds24Worker.on('ready', () => {
-  logger.info('✅ Beds24 worker ready to process jobs');
+  logger.warn({
+    event: 'WORKER_READY',
+    workerName: 'beds24-sync',
+    concurrency: 1,
+    timestamp: new Date().toISOString()
+  }, 'WORKER READY: Beds24 worker initialized and ready to process jobs');
+});
+
+// Add active event handler to see when worker starts processing
+beds24Worker.on('active', (job) => {
+  logger.warn({
+    event: 'WORKER_JOB_ACTIVE',
+    jobId: job.id,
+    bookingId: job.data.bookingId,
+    timestamp: new Date().toISOString()
+  }, `WORKER ACTIVE: Job ${job.id} started processing`);
 });
 
 beds24Worker.on('error', (err) => {

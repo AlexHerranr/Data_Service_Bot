@@ -52,6 +52,24 @@ async function main() {
   // Worker is already initialized by importing from queue.manager.js
   logger.info('✅ BullMQ worker started successfully');
   
+  // Debug: Check worker status every 30 seconds
+  setInterval(async () => {
+    const { beds24Queue } = await import('./infra/queues/queue.manager.js');
+    const waiting = await beds24Queue.getWaitingCount();
+    const active = await beds24Queue.getActiveCount();
+    const completed = await beds24Queue.getCompletedCount();
+    const failed = await beds24Queue.getFailedCount();
+    
+    logger.info({
+      event: 'QUEUE_STATUS_CHECK',
+      waiting,
+      active,
+      completed,
+      failed,
+      timestamp: new Date().toISOString()
+    }, `Queue status - Waiting: ${waiting}, Active: ${active}, Completed: ${completed}, Failed: ${failed}`);
+  }, 30000);
+  
   // Routes
   const router = express.Router();
   registerHealthRoute(router);
