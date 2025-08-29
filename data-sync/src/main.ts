@@ -59,6 +59,72 @@ async function main() {
   // Mount all routes under /api/v1
   app.use('/api/v1', router);
   
+  // LEGACY: Support old webhook path for backwards compatibility
+  // Beds24 is configured to send to /api/webhooks/beds24
+  app.post('/api/webhooks/beds24', async (req, res) => {
+    try {
+      const payload = req.body;
+      const bookingId = payload?.booking?.id || payload?.bookingId || payload?.id;
+      
+      if (!bookingId) {
+        logger.warn({ 
+          path: '/api/webhooks/beds24',
+          payload: JSON.stringify(payload).substring(0, 200) 
+        }, 'Legacy path: Webhook missing booking ID');
+        
+        return res.status(400).json({ 
+          error: 'Missing booking ID'
+        });
+      }
+
+      logger.info({
+        event: 'LEGACY_PATH_WEBHOOK',
+        path: '/api/webhooks/beds24',
+        bookingId: bookingId.toString(),
+        note: 'Using legacy webhook path',
+        timestamp: new Date().toISOString()
+      });
+
+      // Process with new handler
+      await webhookProcessor.handleWebhook(
+        bookingId.toString(), 
+        payload
+      );
+
+      return res.status(200).json({ 
+        status: 'accepted',
+        bookingId: bookingId.toString()
+      });
+
+    } catch (error: any) {
+      logger.error({
+        event: 'LEGACY_PATH_ERROR',
+        path: '/api/webhooks/beds24',
+        error: error.message,
+        timestamp: new Date().toISOString()
+      });
+      
+      // Still return 200 to prevent Beds24 retries
+      return res.status(200).json({ 
+        status: 'error'
+      });
+    }
+  });
+
+  // ALSO support without /api prefix (just in case)
+  app.post('/webhooks/beds24', async (req, res) => {
+    logger.info({
+      event: 'WEBHOOK_ALTERNATE_PATH',
+      path: '/webhooks/beds24',
+      note: 'Redirecting to handler',
+      timestamp: new Date().toISOString()
+    });
+    
+    // Reuse the same logic
+    req.url = '/api/webhooks/beds24';
+    return app._router.handle(req, res);
+  });
+  
   // Root status endpoint
   app.get('/', (req, res) => {
     res.json({
