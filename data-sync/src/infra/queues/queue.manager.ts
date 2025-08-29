@@ -231,7 +231,7 @@ export const beds24Worker = new Worker<JobData>(
   },
   {
     connection: redis,
-    concurrency: 2, // Reducir concurrencia para evitar timeouts
+    concurrency: 1, // Procesamiento secuencial para mantener orden FIFO
     stalledInterval: 30000, // 30s default explicit per docs
     limiter: {
       max: 5,

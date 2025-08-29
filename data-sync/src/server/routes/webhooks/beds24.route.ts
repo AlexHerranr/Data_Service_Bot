@@ -85,18 +85,18 @@ export function registerBeds24Webhook(router: Router): void {
             lastMessageSource: payload.messages?.[payload.messages.length - 1]?.source || 'unknown'
           }, '💬 MODIFY with messages - processing immediately');
         } else {
-          // Para otras modificaciones (precio, estado, etc), esperar 3 minutos
-          jobDelay = 180000; // 3 minutos en milisegundos
-          delayReason = '3-minute-delay-for-data-modifications';
+          // Para otras modificaciones (precio, estado, etc), esperar 1 minuto
+          jobDelay = 60000; // 1 minuto en milisegundos
+          delayReason = '1-minute-delay-for-data-modifications';
           
           logger.info({ 
             bookingId, 
             action,
-            delayMinutes: 3,
+            delayMinutes: 1,
             delayMs: jobDelay,
             scheduledFor: new Date(Date.now() + jobDelay).toISOString(),
             modificationType: 'data-update'
-          }, '⏰ MODIFY without messages - scheduled for 3 minutes delay');
+          }, '⏰ MODIFY without messages - scheduled for 1 minute delay');
         }
       } else if (action === 'CREATED') {
         // Para nuevas reservas, procesar inmediatamente
