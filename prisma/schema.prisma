@@ -74,39 +74,26 @@ model Booking {
   @@index([status])
 }
 
-// Force Prisma client regeneration - removed leadType constraint
+// Optimized Leads table - Only essential fields for sales conversion
+// Purpose: Track "Futura Pendiente" bookings until they pay deposit
 
 model Leads {
-  id               Int       @id @default(autoincrement())
-  bookingId        String?   @unique
-  phone            String
-  guestName        String?
-  propertyName     String?
-  arrivalDate      String
-  departureDate    String?
-  totalPersons     Int?
-  source           String
-  channel          String?
-  priority         String    @default("media")
-  notes            String?
-  createdAt        DateTime  @default(now())
-  lastUpdatedLeads DateTime  @default(now())
-  numNights        Int?
-  estimatedValue   String?
-  assignedTo       String?
-  lastContactAt    DateTime?
-  nextFollowUp     DateTime?
-  lastUpdated      DateTime  @default(now())
+  id            Int      @id @default(autoincrement())
+  bookingId     String   @unique
+  guestName     String
+  phone         String
+  propertyName  String
+  arrivalDate   DateTime @db.Date  // Only date, no time
+  departureDate DateTime @db.Date  // Only date, no time
+  numNights     Int
+  totalPersons  Int
+  channel       String
+  createdAt     DateTime @default(now())
 
   @@index([arrivalDate])
   @@index([phone])
-  @@index([priority])
-  @@index([source])
-  @@index([arrivalDate], map: "idx_Leads_arrivalDate")
-  @@index([phone], map: "idx_Leads_phone")
-  @@index([assignedTo])
-  @@index([lastContactAt])
-  @@index([nextFollowUp])
+  @@index([channel])
+  @@index([propertyName, arrivalDate])
 }
 
 model IA_CMR_Clientes {
