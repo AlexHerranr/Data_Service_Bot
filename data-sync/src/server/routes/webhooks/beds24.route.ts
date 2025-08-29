@@ -86,7 +86,7 @@ export function registerBeds24Webhook(router: Router): void {
           action: action,
           fullPayload: payload
         },
-        delayReason: delayReason,
+        delayReason: '1-minute-standard-delay',
         scheduledFor: jobDelay > 0 ? new Date(Date.now() + jobDelay).toISOString() : null
       }, jobOptions);
 
@@ -95,7 +95,7 @@ export function registerBeds24Webhook(router: Router): void {
         bookingId, 
         action,
         delay: jobDelay,
-        delayReason: delayReason,
+        delayReason: '1-minute-standard-delay',
         scheduledFor: jobDelay > 0 ? new Date(Date.now() + jobDelay).toISOString() : 'immediate'
       }, 'Beds24 webhook job queued')
       
