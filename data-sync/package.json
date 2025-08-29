@@ -32,6 +32,7 @@
     "sync:modified": "node dist/scripts/update-modified-bookings.js",
     "sync:quick": "node dist/scripts/update-modified-bookings.js 2",
     "sync:complete": "node dist/scripts/sync-complete-period.js",
+    "sync:optimized": "node dist/scripts/sync-optimized.js",
     "typecheck": "npx tsc --noEmit",
     "test-build": "npm run typecheck && npm run build"
   },
