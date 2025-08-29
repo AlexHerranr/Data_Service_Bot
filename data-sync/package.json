@@ -6,9 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/main.ts",
-    "dev:simple": "tsx watch src/main-simple.ts",
     "start": "node dist/main.js",
-    "start:simple": "node dist/main-simple.js",
     "prestart": "npx prisma generate --schema ../prisma/schema.prisma",
     "build": "npx tsc -p tsconfig.json",
     "test:webhook": "node test-webhook-debounce.js",

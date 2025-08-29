@@ -45,20 +45,13 @@ export async function syncSingleBooking(bookingId: string, webhookPayload?: any)
   table: 'Booking' | 'Leads' | 'ReservationsCancelled';
 }> {
   try {
-    logger.info({ bookingId }, '🔍 SYNC STEP A: syncSingleBooking started');
-    
+    // Skip test bookings
     if (String(bookingId).startsWith('999')) {
-      logger.debug({ bookingId }, '🧪 SYNC STEP A.1: Skipping test booking');
       return { success: true, action: 'skipped', table: 'Booking' };
     }
 
-    logger.info({ bookingId }, '🚀 SYNC STEP B: Starting sync for booking');
-
     // Fetch complete booking data from Beds24 API
-    logger.info({ bookingId }, '🌐 SYNC STEP C: Getting Beds24 client');
     const client = getBeds24Client();
-    
-    logger.info({ bookingId }, '📡 SYNC STEP D: Fetching booking from Beds24 API');
     let bookingData = await client.getBooking(bookingId);
 
     if (!bookingData && webhookPayload) {
@@ -98,14 +91,7 @@ export async function syncSingleBooking(bookingId: string, webhookPayload?: any)
       return { success: true, action: 'skipped', table: 'Booking' };
     }
 
-    logger.info({ 
-      bookingId, 
-      hasData: !!bookingData,
-      dataSource: bookingData === webhookPayload ? 'webhook' : 'api' 
-    }, '✅ SYNC STEP E: Have booking data');
-
     // Process the complete booking data
-    logger.info({ bookingId }, '⚙️ SYNC STEP F: Starting processSingleBookingData');
     return await processSingleBookingData(bookingData);
 
   } catch (error: any) {
@@ -134,7 +120,7 @@ export async function processSingleBookingData(bookingData: any): Promise<{
     logger.info({ bookingId, hasBookingData: !!bookingData }, '🔑 PROCESS STEP 2: Extracted booking ID');
     
     if (!bookingId) {
-      logger.warn({ bookingData }, '❌ PROCESS STEP 2.1: Booking missing bookingId/id');
+      logger.error('No booking ID found in data');
       return { success: false, action: 'skipped', table: 'Booking' };
     }
 

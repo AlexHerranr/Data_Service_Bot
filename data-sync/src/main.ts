@@ -1,265 +1,178 @@
+/**
+ * Data Sync Service - SIMPLE VERSION
+ * 
+ * Clean, maintainable, and focused on what matters:
+ * Processing Beds24 webhooks with proper debounce
+ */
+
 import express from 'express';
-import promBundle from 'express-prom-bundle';
-import swaggerUi from 'swagger-ui-express';
 import { connectPrisma } from './infra/db/prisma.client.js';
 import { connectRedis } from './infra/redis/redis.client.js';
 import { registerHealthRoute } from './server/routes/health.route.js';
 import { registerBeds24Webhook } from './server/routes/webhooks/beds24.route.js';
-import { registerWhapiWebhook } from './server/routes/webhooks/whapi.route.js';
-import { registerQueuesRoute } from './server/routes/admin/queues.route.js';
+import { registerBeds24WebhookV2 } from './server/routes/webhooks/beds24-v2.route.js';
 import { registerTablesRoute } from './server/routes/tables.route.js';
 import { beds24Routes } from './server/routes/beds24/beds24.routes.js';
-import { beds24Client } from './integrations/beds24.client.js';
-import { register } from './infra/metrics/prometheus.js';
-import { swaggerSpec } from './docs/openapi.js';
-import { env } from './config/env.js';
+import { webhookProcessor } from './services/webhook-processor.js';
 import { logger } from './utils/logger.js';
-import { beds24Worker, closeQueues } from './infra/queues/queue.manager.js';
+import { env } from './config/env.js';
 
 async function main() {
   const app = express();
   
   // Middleware
-  app.use(express.json());
+  app.use(express.json({ limit: '10mb' }));
   
-  // Prometheus metrics middleware
-  if (env.PROMETHEUS_ENABLED) {
-    app.use(promBundle({
-      includePath: true,
-      includeStatusCode: true,
-      includeMethod: true,
-      metricsPath: '/metrics',
-      promRegistry: register,
-      httpDurationMetricName: `${env.METRICS_PREFIX}http_request_duration_seconds`,
-    }));
-  }
-  
-  // Connect to database and Redis
+  // Connect to PostgreSQL (required)
   await connectPrisma();
-  await connectRedis();
+  logger.info('✅ Connected to PostgreSQL');
   
-  // Initialize Beds24 client with persistent auth (Redis cache)
+  // Connect to Redis (optional - only for caching tokens)
   try {
-    await beds24Client.initialize();
-    logger.info('✅ Beds24 client initialized successfully');
-  } catch (error: any) {
-    logger.warn({ error: error.message }, '⚠️ Beds24 write operations will not be available - continuing without write auth');
-    // Continue startup even if Beds24 init fails (READ operations still work)
-  }
-
-  // Clean old jobs before starting worker
-  logger.info('🧺 Cleaning old jobs from queue...');
-  const { beds24Queue } = await import('./infra/queues/queue.manager.js');
-  
-  let totalRemoved = 0;
-  
-  // Remove delayed jobs older than 5 minutes (they're likely from previous runs)
-  const delayedJobs = await beds24Queue.getDelayed();
-  for (const job of delayedJobs) {
-    const jobAge = Date.now() - job.timestamp;
-    // Only remove if older than 5 minutes (our max delay is 1 minute)
-    if (jobAge > 5 * 60 * 1000) {
-      await job.remove();
-      totalRemoved++;
-      logger.info({ 
-        jobId: job.id, 
-        age: Math.floor(jobAge / 1000) + 's',
-        type: 'delayed'
-      }, `Removed old delayed job: ${job.id}`);
-    } else {
-      logger.info({ 
-        jobId: job.id, 
-        age: Math.floor(jobAge / 1000) + 's',
-        type: 'delayed',
-        kept: true
-      }, `Kept recent delayed job: ${job.id}`);
-    }
+    await connectRedis();
+    logger.info('✅ Connected to Redis (for token caching)');
+  } catch (error) {
+    logger.warn('⚠️ Redis not connected - will work without caching');
   }
   
-  // Remove waiting jobs older than 2 minutes
-  const waitingJobs = await beds24Queue.getWaiting();
-  for (const job of waitingJobs) {
-    const jobAge = Date.now() - job.timestamp;
-    if (jobAge > 2 * 60 * 1000) { // Older than 2 minutes
-      await job.remove();
-      totalRemoved++;
-      logger.info({ 
-        jobId: job.id, 
-        age: Math.floor(jobAge / 1000) + 's',
-        type: 'waiting' 
-      }, `Removed old waiting job: ${job.id}`);
-    }
-  }
-  
-  // Clean failed jobs older than 10 minutes
-  const failedJobs = await beds24Queue.getFailed();
-  for (const job of failedJobs) {
-    const jobAge = Date.now() - job.timestamp;
-    if (jobAge > 10 * 60 * 1000) { // Older than 10 minutes
-      await job.remove();
-      totalRemoved++;
-      logger.info({ 
-        jobId: job.id, 
-        age: Math.floor(jobAge / 1000) + 's',
-        type: 'failed'
-      }, `Removed old failed job: ${job.id}`);
-    }
-  }
-  
-  if (totalRemoved > 0) {
-    logger.warn({ 
-      count: totalRemoved,
-      delayed: delayedJobs.length,
-      waiting: waitingJobs.filter(j => Date.now() - j.timestamp > 2 * 60 * 1000).length,
-      failed: failedJobs.filter(j => Date.now() - j.timestamp > 10 * 60 * 1000).length
-    }, `🧺 CLEANED ${totalRemoved} old jobs from queue on startup`);
-  }
-  
-  // Initialize BullMQ worker
-  logger.info('🔄 Starting BullMQ worker...');
-  const { beds24Worker } = await import('./infra/queues/queue.manager.js');
-  
-  // Ensure worker is running
-  if (!beds24Worker.isRunning()) {
-    await beds24Worker.run();
-    logger.warn('Worker was not running, started it manually');
-  }
-  
-  logger.info('✅ BullMQ worker started successfully');
-  
-  // Process any delayed jobs that should have already run
-  const delayedJobsToProcess = await beds24Queue.getDelayed();
-  for (const job of delayedJobsToProcess) {
-    const delayedUntil = await job.getDelayedTime();
-    if (delayedUntil && delayedUntil <= Date.now()) {
-      // This job should have already been processed
-      await job.promote();
-      logger.warn({ 
-        jobId: job.id,
-        delayedUntil: new Date(delayedUntil).toISOString(),
-        now: new Date().toISOString()
-      }, 'Promoted overdue delayed job to waiting queue');
-    }
-  }
-  
-  // Debug: Check worker status every 30 seconds
-  setInterval(async () => {
-    const { beds24Queue, beds24Worker } = await import('./infra/queues/queue.manager.js');
-    const waiting = await beds24Queue.getWaitingCount();
-    const active = await beds24Queue.getActiveCount();
-    const completed = await beds24Queue.getCompletedCount();
-    const failed = await beds24Queue.getFailedCount();
-    const delayed = await beds24Queue.getDelayedCount();
-    
-    // Check worker status
-    const isRunning = beds24Worker.isRunning();
-    const isPaused = await beds24Worker.isPaused();
-    
-    logger.info({
-      event: 'QUEUE_STATUS_CHECK',
-      waiting,
-      active,
-      completed,
-      failed,
-      delayed,
-      workerRunning: isRunning,
-      workerPaused: isPaused,
-      timestamp: new Date().toISOString()
-    }, `Queue status - Waiting: ${waiting}, Active: ${active}, Delayed: ${delayed}, Completed: ${completed}, Failed: ${failed} | Worker: ${isRunning ? 'Running' : 'Stopped'} ${isPaused ? '(Paused)' : ''}`);
-  }, 30000);
+  // Initialize Beds24 client
+  const { beds24Client } = await import('./integrations/beds24.client.js');
+  await beds24Client.init();
+  logger.info('✅ Beds24 client initialized');
   
   // Routes
   const router = express.Router();
+  
+  // Core routes
   registerHealthRoute(router);
-  registerBeds24Webhook(router);
-  registerWhapiWebhook(router);
-  registerQueuesRoute(router);
+  registerBeds24Webhook(router);     // Legacy endpoint (redirects to V2)
+  registerBeds24WebhookV2(router);   // New simple webhook handler
   registerTablesRoute(router);
   
-  // Beds24 API routes
+  // Beds24 API routes (for manual sync, etc)
   router.use('/beds24', beds24Routes);
   
-  app.use('/api', router);
+  // Mount all routes under /api/v1
+  app.use('/api/v1', router);
   
-  // Metrics endpoint (if not handled by promBundle)
-  if (env.PROMETHEUS_ENABLED) {
-    app.get('/metrics', async (req, res) => {
-      try {
-        res.set('Content-Type', register.contentType);
-        res.end(await register.metrics());
-      } catch (error) {
-        res.status(500).end(error);
-      }
-    });
-  }
-
-  // Swagger API documentation
-  if (env.SWAGGER_ENABLED) {
-    app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
-      explorer: true,
-      customCss: '.swagger-ui .topbar { display: none }',
-      customSiteTitle: 'Data Sync API Documentation',
-      swaggerOptions: {
-        persistAuthorization: true,
-        displayRequestDuration: true,
-        filter: true,
-        showExtensions: true,
-        showCommonExtensions: true,
-      },
-    }));
-    
-    // Raw OpenAPI spec endpoint
-    app.get('/api-docs.json', (req, res) => {
-      res.setHeader('Content-Type', 'application/json');
-      res.send(swaggerSpec);
-    });
-  }
-
-  // Root redirect for convenience
+  // Root status endpoint
   app.get('/', (req, res) => {
     res.json({
       service: 'data-sync',
-      version: '1.0.1',
+      version: '2.0.0',
+      status: 'healthy',
       endpoints: {
-        health: '/api/health',
-        webhooks: {
-          beds24: '/api/webhooks/beds24',
-          whapi: '/api/webhooks/whapi'
-        },
-        tables: '/api/tables/:tableName',
-        beds24: {
-          bookings: '/api/beds24/bookings',
-          properties: '/api/beds24/properties',
-          availability: '/api/beds24/availability'
-        },
-        dashboard: '/api/admin/queues/ui',
-        stats: '/api/admin/queues/stats',
-        metrics: env.PROMETHEUS_ENABLED ? '/metrics' : null,
-        docs: env.SWAGGER_ENABLED ? '/api-docs' : null,
+        webhook: '/api/v1/beds24/v2',
+        webhookStatus: '/api/v1/beds24/v2/status',
+        health: '/api/v1/health',
+        tables: '/api/v1/tables'
       }
+    });
+  });
+  
+  // Detailed status endpoint
+  app.get('/status', (req, res) => {
+    const webhookStatus = webhookProcessor.getStatus();
+    res.json({
+      service: 'data-sync',
+      version: '2.0.0',
+      uptime: Math.floor(process.uptime()),
+      webhook: {
+        ...webhookStatus,
+        debounceTimeSeconds: webhookStatus.debounceTimeMs / 1000
+      },
+      memory: {
+        used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024) + ' MB',
+        total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024) + ' MB'
+      },
+      timestamp: new Date().toISOString()
     });
   });
   
   // Start server
-  app.listen(env.PORT, () => {
-    logger.info(`[data-sync] listening on :${env.PORT}`);
+  const port = env.PORT || 8080;
+  const server = app.listen(port, () => {
+    logger.info({
+      event: 'SERVER_STARTED',
+      port,
+      environment: env.NODE_ENV,
+      webhookDebounceMs: parseInt(process.env.WEBHOOK_DEBOUNCE_MS || '60000'),
+      endpoints: {
+        webhook: `http://localhost:${port}/api/v1/beds24/v2`,
+        status: `http://localhost:${port}/status`
+      },
+      timestamp: new Date().toISOString()
+    }, `[data-sync] listening on :${port}`);
+  });
+  
+  // Graceful shutdown
+  const shutdown = async (signal: string) => {
+    logger.info({
+      event: 'SHUTDOWN_INITIATED',
+      signal,
+      pendingWebhooks: webhookProcessor.getStatus().pending,
+      timestamp: new Date().toISOString()
+    });
+    
+    // Stop accepting new connections
+    server.close(() => {
+      logger.info('HTTP server closed');
+    });
+    
+    // Handle pending webhooks
+    const processPending = process.env.PROCESS_PENDING_ON_SHUTDOWN === 'true';
+    
+    if (processPending && webhookProcessor.getStatus().pending > 0) {
+      logger.info('Processing pending webhooks before shutdown...');
+      await webhookProcessor.processAllPending();
+    } else if (webhookProcessor.getStatus().pending > 0) {
+      logger.info('Clearing pending webhooks (Beds24 will retry)...');
+      webhookProcessor.clearAll();
+    }
+    
+    // Close database connections
+    await prisma.$disconnect();
+    logger.info('Database disconnected');
+    
+    logger.info({
+      event: 'SHUTDOWN_COMPLETE',
+      timestamp: new Date().toISOString()
+    });
+    
+    process.exit(0);
+  };
+  
+  // Handle shutdown signals
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
+  
+  // Handle errors
+  process.on('uncaughtException', (error) => {
+    logger.error({
+      event: 'UNCAUGHT_EXCEPTION',
+      error: error.message,
+      stack: error.stack,
+      timestamp: new Date().toISOString()
+    });
+    shutdown('UNCAUGHT_EXCEPTION');
+  });
+  
+  process.on('unhandledRejection', (reason, promise) => {
+    logger.error({
+      event: 'UNHANDLED_REJECTION',
+      reason,
+      timestamp: new Date().toISOString()
+    });
   });
 }
 
-// Graceful shutdown
-process.on('SIGTERM', async () => {
-  logger.info('SIGTERM received, shutting down gracefully...');
-  await closeQueues();
-  process.exit(0);
-});
-
-process.on('SIGINT', async () => {
-  logger.info('SIGINT received, shutting down gracefully...');
-  await closeQueues();
-  process.exit(0);
-});
-
+// Start the application
 main().catch((error) => {
-  logger.error({ error: error.message }, 'Failed to start data-sync');
+  logger.error({
+    event: 'STARTUP_FAILED',
+    error: error.message,
+    stack: error.stack,
+    timestamp: new Date().toISOString()
+  });
   process.exit(1);
 });
