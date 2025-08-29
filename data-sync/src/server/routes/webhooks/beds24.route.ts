@@ -61,18 +61,19 @@ export function registerBeds24Webhook(router: Router): void {
       // Record webhook metrics
       metricsHelpers.recordWebhook('beds24', action.toLowerCase());
 
-      // SIMPLIFICADO: Todos los webhooks esperan 1 minuto
-      const jobDelay = 60000; // 1 minuto en milisegundos
-      const delayReason = '1-minute-standard-delay';
+      // Standard 1 minute delay for all webhooks
+      const jobDelay = 60000; // 1 minute in milliseconds
       
       logger.info({ 
-        bookingId, 
-        action,
-        delayMinutes: 1,
+        event: 'WEBHOOK_RECEIVED',
+        bookingId: bookingId,
+        action: action,
         delayMs: jobDelay,
         scheduledFor: new Date(Date.now() + jobDelay).toISOString(),
-        messageCount: payload.messages?.length || 0
-      }, '⏰ Webhook scheduled for processing in 1 minute');
+        messageCount: payload.messages?.length || 0,
+        propertyId: payload.propertyId || payload.booking?.propertyId,
+        timestamp: new Date().toISOString()
+      }, `Webhook received for booking ${bookingId}, scheduled for processing`);
 
       // Encolar job con delay de 1 minuto
       const jobOptions = { delay: jobDelay };

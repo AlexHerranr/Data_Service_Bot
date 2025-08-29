@@ -208,43 +208,42 @@ export async function processSingleBookingData(bookingData: any): Promise<{
       },
     });
     
-    // 🔍 LOG DETALLADO DE CONFIRMACIÓN DE BD
-    const dbAction = existing ? 'ACTUALIZADA' : 'CREADA';
+    // Database operation result logging
+    const dbAction = existing ? 'UPDATE' : 'INSERT';
+    
+    // Critical log for database confirmation
     logger.info({ 
-      bookingId, 
-      dbResultId: result.id,
-      wasCreated: !existing,
-      dbAction
-    }, `✅ PROCESS STEP 9: Database upsert completed - Reserva ${dbAction}`);
+      event: 'DB_OPERATION_SUCCESS',
+      operation: 'UPSERT',
+      action: dbAction,
+      bookingId: bookingId,
+      dbId: result.id,
+      wasExisting: !!existing,
+      timestamp: new Date().toISOString()
+    }, `Database ${dbAction} completed for booking ${bookingId}`);
 
-    // 📊 LOG CON DATOS COMPLETOS PARA VERIFICACIÓN
+    // Detailed booking data for verification
     logger.info({ 
-      bookingId, 
-      action: existing ? 'updated' : 'created',
-      table: 'Booking',
-      resultId: result.id,
+      event: 'BOOKING_DATA_SAVED',
+      bookingId: bookingId,
+      dbId: result.id,
       guestName: result.guestName,
-      phone: result.phone,
+      propertyName: result.propertyName,
       status: result.status,
       bdStatus: result.BDStatus,
-      propertyName: result.propertyName,
       arrivalDate: result.arrivalDate,
       departureDate: result.departureDate,
+      numNights: result.numNights,
+      totalPersons: result.totalPersons,
       totalCharges: result.totalCharges,
-      lastUpdatedBD: result.lastUpdatedBD
-    }, '🎉 PROCESS STEP 10: Successfully synced to BD - Booking table');
-    
-    // 🚨 LOG CRÍTICO DE CONFIRMACIÓN (FÁCIL DE BUSCAR EN LOGS)
-    logger.warn({ 
-      '⭐ RESERVA_GUARDADA_EN_BD': true,
-      bookingId,
-      dbId: result.id,
-      action: dbAction,
-      guestName: result.guestName,
-      property: result.propertyName,
-      dates: `${result.arrivalDate} to ${result.departureDate}`,
+      totalPayments: result.totalPayments,
+      balance: result.balance,
+      phone: result.phone || null,
+      email: result.email || null,
+      channel: result.channel,
+      lastUpdatedBD: result.lastUpdatedBD,
       timestamp: new Date().toISOString()
-    }, `✅✅✅ CONFIRMACIÓN BD: Reserva ${bookingId} ${dbAction} exitosamente - Guest: ${result.guestName}`);
+    }, `Booking data saved: ${bookingId} - ${result.guestName}`);
     
     const finalResult = { success: true, action: existing ? 'updated' : 'created', table: 'Booking' } as const;
     logger.info({ bookingId, finalResult }, '🏁 PROCESS STEP 11: Returning success result');
@@ -253,18 +252,19 @@ export async function processSingleBookingData(bookingData: any): Promise<{
 
   } catch (error: any) {
     const bookingId = (bookingData?.bookingId || bookingData?.id)?.toString() || 'unknown';
+    
+    // Structured error logging
     logger.error({ 
-      bookingId,
-      error: error.message, 
+      event: 'DB_OPERATION_FAILED',
+      bookingId: bookingId,
+      errorCode: error.code || 'UNKNOWN',
+      errorMessage: error.message,
+      errorType: error.code === 'P2002' ? 'UNIQUE_CONSTRAINT_VIOLATION' : 'DATABASE_ERROR',
       stack: error.stack,
-      data: bookingData,
-      constraint: error.code === 'P2002' ? 'unique_constraint' : error.code
-    }, '💥 PROCESS ERROR: Failed to sync to BD - check constraints and data');
+      timestamp: new Date().toISOString()
+    }, `Database operation failed for booking ${bookingId}: ${error.message}`);
     
-    const errorResult = { success: false, action: 'skipped', table: 'Booking' } as const;
-    logger.info({ bookingId, errorResult }, '🚫 PROCESS STEP 12: Returning error result');
-    
-    return errorResult;
+    return { success: false, action: 'skipped', table: 'Booking' } as const;
   }
 }
 

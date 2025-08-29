@@ -135,17 +135,18 @@ export const beds24Worker = new Worker<JobData>(
         logger.info({ jobId: job.id }, '📊 STEP 12: Recording metrics');
         metricsHelpers.recordJobComplete(data.type, startTime, 'success');
         
-        // 🎯 LOG FINAL DE CONFIRMACIÓN DEL PROCESO COMPLETO
+        // Final processing confirmation
         const processingTime = Date.now() - startTime;
-        logger.warn({
-          '🏆 PROCESO_COMPLETO': true,
+        logger.info({
+          event: 'JOB_COMPLETED',
           jobId: job.id,
-          bookingId,
+          bookingId: bookingId,
           syncResult: syncResult.action,
+          syncSuccess: syncResult.success,
           processingTimeMs: processingTime,
-          processingTimeSec: (processingTime / 1000).toFixed(2),
+          processingTimeSec: parseFloat((processingTime / 1000).toFixed(2)),
           timestamp: new Date().toISOString()
-        }, `🎉🎉🎉 ÉXITO TOTAL: Reserva ${bookingId} procesada completamente en ${(processingTime / 1000).toFixed(2)}s`);
+        }, `Job completed: ${bookingId} - ${syncResult.action} in ${(processingTime / 1000).toFixed(2)}s`);
         
         logger.info({ 
           jobId: job.id, 
