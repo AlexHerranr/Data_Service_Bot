@@ -62,7 +62,6 @@ model Booking {
   lastUpdatedBD DateTime @default(now())
   raw           Json?
   BDStatus      String?
-  leadType      String?  @default("booking")
 
   @@index([arrivalDate])
   @@index([bookingId])
