@@ -50,7 +50,7 @@ export function registerBeds24WebhookV2(router: Router) {
       );
 
       // Immediate response (Beds24 expects 200 quickly)
-      res.status(200).json({ 
+      return res.status(200).json({ 
         status: 'accepted',
         bookingId: bookingId.toString(),
         message: 'Scheduled for processing'
@@ -65,7 +65,7 @@ export function registerBeds24WebhookV2(router: Router) {
       });
       
       // Still return 200 to prevent Beds24 retries
-      res.status(200).json({ 
+      return res.status(200).json({ 
         status: 'error',
         message: 'Internal error, will retry'
       });

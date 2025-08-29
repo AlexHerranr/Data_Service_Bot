@@ -9,7 +9,7 @@
 import { logger } from '../utils/logger.js';
 import { getBeds24Client } from '../providers/beds24/client.js';
 import { processSingleBookingData } from '../providers/beds24/sync.js';
-import { prisma } from '../infra/prisma/prisma-client.js';
+import { prisma } from '../infra/db/prisma.client.js';
 
 interface PendingWebhook {
   timeoutId: NodeJS.Timeout;

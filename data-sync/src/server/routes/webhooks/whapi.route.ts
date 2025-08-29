@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { logger } from '../../../utils/logger.js';
-import { beds24Queue } from '../../../infra/queues/queue.manager.js';
+// import { beds24Queue } from '../../../infra/queues/queue.manager.js'; // Removed - no longer using queues
 import { metricsHelpers } from '../../../infra/metrics/prometheus.js';
 
 export function registerWhapiWebhook(router: Router): void {
@@ -33,21 +33,13 @@ export function registerWhapiWebhook(router: Router): void {
       // Record webhook metrics
       metricsHelpers.recordWebhook('whapi', type);
 
-      // Encolar job para procesamiento asíncrono
+      // TODO: Process Whapi webhooks when needed
+      // For now, just log and acknowledge
       if (type === 'message' || type === 'message_status' || type === 'client_ready') {
-        const job = await beds24Queue.add('whapi-webhook', {
-          type: 'whapi',
-          source: 'whapi',
-          webhookType: type,
-          data,
-          timestamp: new Date(),
-          priority: 'normal',
-        });
-
         logger.info({ 
-          jobId: job.id,
-          type 
-        }, 'Whapi webhook job queued successfully');
+          webhookType: type,
+          note: 'Whapi processing not implemented in simplified version'
+        }, 'Whapi webhook received but not processed');
       } else {
         logger.warn({ 
           type 

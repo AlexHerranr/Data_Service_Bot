@@ -2,8 +2,8 @@ import { Router, Request, Response } from 'express';
 import { logger } from '../../utils/logger.js';
 import { redis } from '../../infra/redis/redis.client.js';
 import { prisma } from '../../infra/db/prisma.client.js';
-import { getQueueStats } from '../../infra/queues/queue.manager.js';
 import { metricsHelpers } from '../../infra/metrics/prometheus.js';
+import { webhookProcessor } from '../../services/webhook-processor.js';
 
 export function registerHealthRoute(router: Router): void {
   router.get('/health', async (req: Request, res: Response) => {
@@ -30,12 +30,12 @@ export function registerHealthRoute(router: Router): void {
         databaseStatus = 'disconnected';
       }
       
-      // Check queue health
-      let queueStats = null;
+      // Check webhook processor health
+      let webhookStats = null;
       try {
-        queueStats = await getQueueStats();
+        webhookStats = webhookProcessor.getStatus();
       } catch (error) {
-        // Queue stats not critical for basic health
+        // Webhook stats not critical for basic health
       }
       
       // Determine overall health
@@ -61,14 +61,11 @@ export function registerHealthRoute(router: Router): void {
           redis: redisStatus,
           database: databaseStatus,
         },
-        ...(queueStats && {
-          queues: {
-            'beds24-sync': {
-              waiting: queueStats.waiting,
-              active: queueStats.active,
-              failed: queueStats.failed,
-              total: queueStats.total,
-            }
+        ...(webhookStats && {
+          webhooks: {
+            pending: webhookStats.pending,
+            processedTotal: webhookStats.processedTotal,
+            debouncedTotal: webhookStats.debouncedTotal,
           }
         }),
         version: '1.0.0',

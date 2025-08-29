@@ -6,7 +6,7 @@
  */
 
 import express from 'express';
-import { connectPrisma } from './infra/db/prisma.client.js';
+import { connectPrisma, prisma } from './infra/db/prisma.client.js';
 import { connectRedis } from './infra/redis/redis.client.js';
 import { registerHealthRoute } from './server/routes/health.route.js';
 import { registerBeds24Webhook } from './server/routes/webhooks/beds24.route.js';
@@ -36,9 +36,13 @@ async function main() {
   }
   
   // Initialize Beds24 client
-  const { beds24Client } = await import('./integrations/beds24.client.js');
-  await beds24Client.init();
-  logger.info('✅ Beds24 client initialized');
+  try {
+    const { initBeds24Client } = await import('./providers/beds24/client.js');
+    await initBeds24Client();
+    logger.info('✅ Beds24 client initialized');
+  } catch (error) {
+    logger.warn('⚠️ Beds24 client initialization failed, will retry on first use');
+  }
   
   // Routes
   const router = express.Router();

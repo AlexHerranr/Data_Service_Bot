@@ -44,7 +44,7 @@ export function registerBeds24Webhook(router: Router) {
         payload
       );
 
-      res.status(200).json({ 
+      return res.status(200).json({ 
         status: 'accepted',
         bookingId: bookingId.toString(),
         processor: 'v2'
@@ -57,7 +57,7 @@ export function registerBeds24Webhook(router: Router) {
         timestamp: new Date().toISOString()
       });
       
-      res.status(200).json({ 
+      return res.status(200).json({ 
         status: 'error'
       });
     }
