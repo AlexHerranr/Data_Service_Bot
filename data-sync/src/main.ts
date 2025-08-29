@@ -37,8 +37,8 @@ async function main() {
   
   // Initialize Beds24 client
   try {
-    const { initBeds24Client } = await import('./providers/beds24/client.js');
-    await initBeds24Client();
+    const { getBeds24Client } = await import('./providers/beds24/client.js');
+    getBeds24Client(); // Initialize singleton instance
     logger.info('✅ Beds24 client initialized');
   } catch (error) {
     logger.warn('⚠️ Beds24 client initialization failed, will retry on first use');
