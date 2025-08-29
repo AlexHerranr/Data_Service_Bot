@@ -95,67 +95,42 @@ export const beds24Worker = new Worker<JobData>(
         
         logger.info({ jobId: job.id, bookingId, action }, '🔄 STEP 7: Starting syncSingleBooking call');
 
-        // Para CREATED, MODIFY o CANCEL, fetch booking completo y actualizar BD
-        if (action === 'CREATED' || action === 'MODIFY' || action === 'CANCEL') {
-          // Log especial para MODIFY con información de timing
-          if (action === 'MODIFY') {
-            const actualDelay = jobProcessedAt.getTime() - jobCreatedAt.getTime();
-            logger.info({ 
-              jobId: job.id, 
-              bookingId, 
-              action,
-              actualDelayMs: actualDelay,
-              actualDelayMinutes: (actualDelay / 60000).toFixed(2),
-              expectedDelayMinutes: 3,
-              delayReason: (data as any).delayReason || 'none'
-            }, '⏱️ MODIFY action being processed after delay');
-          }
-          
-          logger.info({ jobId: job.id, bookingId, action }, '📡 STEP 8: Calling syncSingleBooking function');
-          
-          const syncResult = await syncSingleBooking(bookingId);
-          
-          logger.info({ 
+        // Beds24 V2: Todo es un cambio de reserva (nueva o modificación)
+        // El upsert en la BD maneja automáticamente si es crear o actualizar
+        const actualDelay = jobProcessedAt.getTime() - jobCreatedAt.getTime();
+        logger.info({ 
+          jobId: job.id, 
+          bookingId,
+          actualDelayMs: actualDelay,
+          actualDelayMinutes: (actualDelay / 60000).toFixed(2),
+          expectedDelayMinutes: 1,
+          delayReason: (data as any).delayReason || 'standard-1-minute-delay'
+        }, '⏱️ Processing booking change after delay');
+        
+        logger.info({ jobId: job.id, bookingId }, '📡 STEP 8: Calling syncSingleBooking function');
+        
+        const syncResult = await syncSingleBooking(bookingId);
+        
+        logger.info({ 
+          jobId: job.id, 
+          bookingId, 
+          syncResult,
+          success: syncResult.success,
+          action: syncResult.action,
+          table: syncResult.table
+        }, '📋 STEP 9: syncSingleBooking completed');
+        
+        // ✅ VERIFICAR SUCCESS antes de marcar como completado
+        if (!syncResult.success) {
+          logger.error({ 
             jobId: job.id, 
             bookingId, 
-            syncResult,
-            success: syncResult.success,
-            action: syncResult.action,
-            table: syncResult.table
-          }, '📋 STEP 9: syncSingleBooking completed');
-          
-          // ✅ VERIFICAR SUCCESS antes de marcar como completado
-          if (!syncResult.success) {
-            logger.error({ 
-              jobId: job.id, 
-              bookingId, 
-              syncResult 
-            }, '❌ STEP 9.1: Sync failed, will throw error');
-            throw new Error(`Sync failed: ${syncResult.action} - ${syncResult.table}`);
-          }
-          
-          logger.info({ jobId: job.id, bookingId }, '✅ STEP 10: Sync success verified');
-          
-          // Si es MODIFY, opcionalmente fetch messages
-          if (action === 'MODIFY') {
-            logger.info({ jobId: job.id, bookingId }, '💬 STEP 11: Processing MODIFY messages');
-            try {
-              // TODO: Implement message sync if needed
-              logger.debug({ bookingId }, 'Message sync could be implemented here');
-            } catch (msgError: any) {
-              logger.warn({ 
-                bookingId, 
-                error: msgError.message 
-              }, 'Message sync failed, continuing');
-            }
-          }
-        } else {
-          logger.warn({ 
-            jobId: job.id, 
-            bookingId, 
-            action 
-          }, '⚠️ STEP 8.1: Action not in [CREATED, MODIFY, CANCEL] - skipping sync');
+            syncResult 
+          }, '❌ STEP 9.1: Sync failed, will throw error');
+          throw new Error(`Sync failed: ${syncResult.action} - ${syncResult.table}`);
         }
+        
+        logger.info({ jobId: job.id, bookingId }, '✅ STEP 10: Sync success verified');
 
         logger.info({ jobId: job.id }, '📊 STEP 12: Recording metrics');
         metricsHelpers.recordJobComplete(data.type, startTime, 'success');
