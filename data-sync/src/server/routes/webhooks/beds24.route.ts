@@ -63,57 +63,21 @@ export function registerBeds24Webhook(router: Router): void {
       // Record webhook metrics
       metricsHelpers.recordWebhook('beds24', action.toLowerCase());
 
-      // Detectar si es una modificación con mensajes nuevos
-      const hasMessages = payload.messages && Array.isArray(payload.messages) && payload.messages.length > 0;
-      const isMessageUpdate = action === 'MODIFY' && hasMessages;
+      // SIMPLIFICADO: Todos los webhooks esperan 1 minuto
+      const jobDelay = 60000; // 1 minuto en milisegundos
+      const delayReason = '1-minute-standard-delay';
       
-      // Determinar el delay basado en la acción y contenido
-      let jobDelay = 0; // Por defecto sin delay
-      let delayReason = 'immediate';
-      
-      if (action === 'MODIFY') {
-        if (isMessageUpdate) {
-          // Si es una modificación con mensajes, procesar inmediatamente
-          jobDelay = 0;
-          delayReason = 'immediate-message-update';
-          
-          logger.info({ 
-            bookingId, 
-            action,
-            messageCount: payload.messages?.length || 0,
-            lastMessage: payload.messages?.[payload.messages.length - 1]?.message?.substring(0, 50) || 'N/A',
-            lastMessageSource: payload.messages?.[payload.messages.length - 1]?.source || 'unknown'
-          }, '💬 MODIFY with messages - processing immediately');
-        } else {
-          // Para otras modificaciones (precio, estado, etc), esperar 1 minuto
-          jobDelay = 60000; // 1 minuto en milisegundos
-          delayReason = '1-minute-delay-for-data-modifications';
-          
-          logger.info({ 
-            bookingId, 
-            action,
-            delayMinutes: 1,
-            delayMs: jobDelay,
-            scheduledFor: new Date(Date.now() + jobDelay).toISOString(),
-            modificationType: 'data-update'
-          }, '⏰ MODIFY without messages - scheduled for 1 minute delay');
-        }
-      } else if (action === 'CREATED') {
-        // Para nuevas reservas, procesar inmediatamente
-        logger.info({ 
-          bookingId, 
-          action
-        }, '🚀 CREATED webhook will be processed immediately');
-      } else if (action === 'CANCEL') {
-        // Para cancelaciones, procesar inmediatamente
-        logger.info({ 
-          bookingId, 
-          action
-        }, '❌ CANCEL webhook will be processed immediately');
-      }
+      logger.info({ 
+        bookingId, 
+        action,
+        delayMinutes: 1,
+        delayMs: jobDelay,
+        scheduledFor: new Date(Date.now() + jobDelay).toISOString(),
+        messageCount: payload.messages?.length || 0
+      }, '⏰ Webhook scheduled for processing in 1 minute');
 
-      // Encolar job con delay si es necesario
-      const jobOptions = jobDelay > 0 ? { delay: jobDelay } : {};
+      // Encolar job con delay de 1 minuto
+      const jobOptions = { delay: jobDelay };
       
       const job = await addWebhookJob({
         bookingId: bookingId,
