@@ -19,6 +19,7 @@ import {
   mapPropertyName
 } from './utils.js';
 import { validateBookingData, isValidBooking } from './validators.js';
+import { mergeMessages, extractMessagesFromPayload } from './message-handler.js';
 import { prisma } from '../../infra/db/prisma.client.js';
 import { logger } from '../../utils/logger.js';
 
@@ -143,7 +144,7 @@ export async function processSingleBookingData(bookingData: any): Promise<{
       apiReference: bookingData.apiReference || null,
       charges: charges,
       payments: payments,
-      messages: extractMessages(bookingData),
+      messages: [], // Se llenará después con merge
       infoItems,
       notes: bookingData.comments || 'no notes',
       bookingDate: formatDateSimple(bookingData.created || bookingData.bookingTime),
@@ -155,11 +156,16 @@ export async function processSingleBookingData(bookingData: any): Promise<{
 
     logger.info({ bookingId }, '📝 PROCESS STEP 5: Creating common data object');
 
-    // Enhanced message handling for MODIFY actions
-    if (bookingData.action === 'MODIFY' || bookingData.action === 'modified') {
-      commonData.messages = extractMessages(bookingData);
-      logger.debug({ bookingId, messageCount: commonData.messages?.length || 0 }, 'Enhanced message extraction for MODIFY action');
-    }
+    // Inteligent message handling - preserve old messages and add new ones
+    const newMessages = extractMessagesFromPayload(bookingData);
+    commonData.messages = await mergeMessages(bookingId, newMessages) as any;
+    
+    logger.info({ 
+      bookingId, 
+      newMessagesCount: newMessages.length,
+      totalMessagesCount: commonData.messages.length,
+      preservedCount: commonData.messages.length - newMessages.length
+    }, '📨 PROCESS STEP 5.1: Messages merged with historical data');
     
     // Validate all data before saving
     const validatedData = validateBookingData(commonData);

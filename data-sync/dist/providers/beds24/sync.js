@@ -1,6 +1,7 @@
 import { getBeds24Client } from './client.js';
-import { formatDateSimple, extractChargesAndPayments, extractInfoItems, calculateNights, determineBDStatus, shouldSyncAsLead, shouldSyncAsConfirmed, extractGuestName, extractPhoneNumber, extractEmail, combineNotes, calculateTotalPersons, determineChannel, extractMessages, mapPropertyName } from './utils.js';
+import { formatDateSimple, extractChargesAndPayments, extractInfoItems, calculateNights, determineBDStatus, shouldSyncAsLead, shouldSyncAsConfirmed, extractGuestName, extractPhoneNumber, extractEmail, combineNotes, calculateTotalPersons, determineChannel, mapPropertyName } from './utils.js';
 import { validateBookingData, isValidBooking } from './validators.js';
+import { mergeMessages, extractMessagesFromPayload } from './message-handler.js';
 import { prisma } from '../../infra/db/prisma.client.js';
 import { logger } from '../../utils/logger.js';
 export async function syncSingleBooking(bookingId) {
@@ -76,7 +77,7 @@ export async function processSingleBookingData(bookingData) {
             apiReference: bookingData.apiReference || null,
             charges: charges,
             payments: payments,
-            messages: extractMessages(bookingData),
+            messages: [],
             infoItems,
             notes: bookingData.comments || 'no notes',
             bookingDate: formatDateSimple(bookingData.created || bookingData.bookingTime),
@@ -86,10 +87,14 @@ export async function processSingleBookingData(bookingData) {
             BDStatus: bdStatus || 'Confirmed',
         };
         logger.info({ bookingId }, '📝 PROCESS STEP 5: Creating common data object');
-        if (bookingData.action === 'MODIFY' || bookingData.action === 'modified') {
-            commonData.messages = extractMessages(bookingData);
-            logger.debug({ bookingId, messageCount: commonData.messages?.length || 0 }, 'Enhanced message extraction for MODIFY action');
-        }
+        const newMessages = extractMessagesFromPayload(bookingData);
+        commonData.messages = await mergeMessages(bookingId, newMessages);
+        logger.info({
+            bookingId,
+            newMessagesCount: newMessages.length,
+            totalMessagesCount: commonData.messages.length,
+            preservedCount: commonData.messages.length - newMessages.length
+        }, '📨 PROCESS STEP 5.1: Messages merged with historical data');
         const validatedData = validateBookingData(commonData);
         const validation = isValidBooking(validatedData);
         if (!validation.valid) {
