@@ -1,0 +1,20 @@
+{
+  "name": "whatsapp-jobs",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Jobs programados para mantenimiento de WhatsApp",
+  "scripts": {
+    "check": "node cleanup-whatsapp-threads.js --check",
+    "cleanup": "node cleanup-whatsapp-threads.js --run",
+    "start": "node cleanup-whatsapp-threads.js --cron",
+    "install-deps": "npm install"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.0.0",
+    "node-cron": "^3.0.3",
+    "dotenv": "^16.0.3"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}
