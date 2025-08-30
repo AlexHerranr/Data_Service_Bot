@@ -13,15 +13,15 @@ model ClientView {
   phoneNumber        String    @id
   name               String?
   userName           String?
-  labels             String?
+  labels             String?   // Etiquetas de WhatsApp
   chatId             String?   @unique
   lastActivity       DateTime  @updatedAt
-  threadId           String?
-  threadTokenCount   Int?      @default(0)
-  profileStatus      String?
-  proximaAccion      String?
-  fechaProximaAccion DateTime?
-  prioridad          Int?
+  threadId           String?   // ID del thread de conversación
+  threadTokenCount   Int?      @default(0) // Contador de tokens para IA
+  lastMessage        String?   // Último mensaje recibido
+  lastMessageType    String?   // Tipo: text/image/audio/video
+  unreadCount        Int?      @default(0) // Mensajes sin leer
+  isActive           Boolean?  @default(false) // Conversación activa
 }
 
 model hotel_apartments {
