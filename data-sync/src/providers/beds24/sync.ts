@@ -22,6 +22,7 @@ import { validateBookingData, isValidBooking } from './validators.js';
 import { mergeMessages, extractMessagesFromPayload } from './message-handler.js';
 import { prisma } from '../../infra/db/prisma.client.js';
 import { logger } from '../../utils/logger.js';
+import { getPropertyNameFromDB, PROPERTY_MAP_FALLBACK } from './get-property-name.js';
 
 export interface SyncResult {
   processed: number;
@@ -139,6 +140,15 @@ export async function processSingleBookingData(bookingData: any): Promise<{
     
     // Data extraction completed
 
+    // Get property name from DB or fallback
+    let propertyName = await getPropertyNameFromDB(bookingData.propertyId);
+    if (!propertyName) {
+      // Fallback to static map if DB lookup fails
+      propertyName = PROPERTY_MAP_FALLBACK[String(bookingData.propertyId)] || 
+                     bookingData.propertyName || 
+                     'Unknown Property';
+    }
+
     // Enhanced booking data with more complete information and null-safe defaults
     const commonData = {
       bookingId,
@@ -146,7 +156,7 @@ export async function processSingleBookingData(bookingData: any): Promise<{
       guestName: guestName || 'Guest Unknown',
       status: bookingData.status || 'confirmed',
       internalNotes: combineNotes(bookingData),
-      propertyName: mapPropertyName(bookingData.propertyId) || bookingData.propertyName || 'Unknown Property',
+      propertyName,
       arrivalDate: formatDateSimple(bookingData.arrival) || new Date().toISOString().split('T')[0],
       departureDate: formatDateSimple(bookingData.departure) || new Date().toISOString().split('T')[0],
       numNights: parseInt(String(numNights)) || 0,  // Force integer

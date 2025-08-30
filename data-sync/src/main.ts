@@ -16,6 +16,7 @@ import { beds24Routes } from './server/routes/beds24/beds24.routes.js';
 import { webhookProcessor } from './services/webhook-processor.js';
 import { logger } from './utils/logger.js';
 import { env } from './config/env.js';
+import { initializeDailySyncCron } from './cron/daily-sync.js';
 
 async function main() {
   const app = express();
@@ -42,6 +43,14 @@ async function main() {
     logger.info('✅ Beds24 client initialized');
   } catch (error) {
     logger.warn('⚠️ Beds24 client initialization failed, will retry on first use');
+  }
+  
+  // Initialize daily sync cron job (1:00 AM every day)
+  try {
+    initializeDailySyncCron();
+    logger.info('⏰ Daily sync cron job initialized (1:00 AM daily)');
+  } catch (error: any) {
+    logger.error({ error: error.message }, '❌ Failed to initialize cron job');
   }
   
   // Routes
