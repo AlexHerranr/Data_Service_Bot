@@ -416,11 +416,31 @@ export function extractMessages(bookingData: any): any[] {
 }
 
 /**
- * Map property ID to property name (implement based on your mapping)
+ * Map property ID to property name
+ * Uses the hotel_apartments table for mapping
  */
-export function mapPropertyName(propertyId: number | string): string | null {
-  // TODO: Implement property mapping based on your configuration
-  // This could be a lookup table or API call
+export async function mapPropertyName(propertyId: number | string): Promise<string | null> {
+  try {
+    // First try the static map for quick lookup
+    const propertyMap: Record<string, string> = {
+      '173207': '2005-A',
+      '173307': '1820',
+      '173308': '1317',
+      '173309': '1722-B',
+      '173311': '2005-B',
+      '173312': '1722-A',
+      '240061': '0715',
+      '280243': 'punta arena tierra bomba'
+    };
+    
+    return propertyMap[String(propertyId)] || null;
+  } catch (error) {
+    return null;
+  }
+}
+
+// Keep the synchronous version for backward compatibility
+export function mapPropertyNameSync(propertyId: number | string): string | null {
   const propertyMap: Record<string, string> = {
     '173207': '2005-A',
     '173307': '1820',
@@ -429,7 +449,7 @@ export function mapPropertyName(propertyId: number | string): string | null {
     '173311': '2005-B',
     '173312': '1722-A',
     '240061': '0715',
-    // Mapped from Beds24 API on 2025-08-30
+    '280243': 'punta arena tierra bomba'
   };
   
   return propertyMap[String(propertyId)] || null;

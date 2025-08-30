@@ -25,12 +25,15 @@ model ClientView {
 }
 
 model hotel_apartments {
-  id          Int    @id @default(autoincrement())
-  propertyId  Int    @map("property_id")
-  roomId      Int    @unique @map("room_id")
-  roomName    String @map("room_name")
-  extraCharge Json   @default("{\"amount\": 70000, \"description\": \"Cargo adicional:\"}") @map("extra_charge")
-  capacity    Int    @default(4)
+  id           Int      @id @default(autoincrement())
+  propertyId   Int      @map("property_id")
+  roomId       Int      @unique @map("room_id")
+  roomName     String   @map("room_name")
+  propertyName String?  @map("property_name")
+  extraCharge  Json     @default("{\"amount\": 70000, \"description\": \"Cargo adicional:\"}") @map("extra_charge")
+  capacity     Int      @default(4)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
 }
 
 model Booking {

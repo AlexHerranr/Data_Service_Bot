@@ -16,7 +16,7 @@ import {
   calculateTotalPersons,
   determineChannel,
   extractMessages,
-  mapPropertyName
+  mapPropertyNameSync as mapPropertyName
 } from './utils.js';
 import { validateBookingData, isValidBooking } from './validators.js';
 import { mergeMessages, extractMessagesFromPayload } from './message-handler.js';
