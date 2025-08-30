@@ -24,6 +24,7 @@
     "bulk-update": "tsx scripts/bulk-update-bookings.ts",
     "bulk-update:dry": "tsx scripts/bulk-update-bookings.ts -- --dry-run",
     "update-properties": "tsx scripts/update-property-mapping.ts",
+    "sync:month-year": "tsx scripts/sync-month-to-year.ts",
     "detect:missing": "tsx scripts/detect-missing-bookings.ts",
     "sync:manual": "tsx scripts/manual-sync-bookings.ts",
     "update:messages": "tsx scripts/update-all-messages.ts",
