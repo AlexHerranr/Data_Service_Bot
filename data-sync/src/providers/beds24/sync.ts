@@ -113,18 +113,18 @@ export async function processSingleBookingData(bookingData: any): Promise<{
   table: 'Booking' | 'Leads' | 'ReservationsCancelled';
 }> {
   try {
-    logger.info({}, '🏁 PROCESS STEP 1: processSingleBookingData started');
+    // Process booking data
     
     // Extract booking ID from different possible fields
     const bookingId = (bookingData.bookingId || bookingData.id)?.toString();
-    logger.info({ bookingId, hasBookingData: !!bookingData }, '🔑 PROCESS STEP 2: Extracted booking ID');
+    // Extracted booking ID
     
     if (!bookingId) {
       logger.error('No booking ID found in data');
       return { success: false, action: 'skipped', table: 'Booking' };
     }
 
-    logger.info({ bookingId }, '⚙️ PROCESS STEP 3: Starting data extraction and transformation');
+    // Extract and transform data
     
     // Extract and transform data from complete Beds24 API response
     const { charges, payments, totalCharges, totalPayments, balance } = extractChargesAndPayments(bookingData);
@@ -137,13 +137,7 @@ export async function processSingleBookingData(bookingData: any): Promise<{
     const phone = extractPhoneNumber(bookingData);
     const email = extractEmail(bookingData);
     
-    logger.info({ 
-      bookingId, 
-      guestName, 
-      phone: phone || 'none', 
-      status: bookingData.status,
-      totalCharges: totalCharges.toString()
-    }, '📊 PROCESS STEP 4: Data extraction completed');
+    // Data extraction completed
 
     // Enhanced booking data with more complete information and null-safe defaults
     const commonData = {
@@ -155,8 +149,8 @@ export async function processSingleBookingData(bookingData: any): Promise<{
       propertyName: mapPropertyName(bookingData.propertyId) || bookingData.propertyName || 'Unknown Property',
       arrivalDate: formatDateSimple(bookingData.arrival) || new Date().toISOString().split('T')[0],
       departureDate: formatDateSimple(bookingData.departure) || new Date().toISOString().split('T')[0],
-      numNights: Math.floor(numNights) || 0,
-      totalPersons: calculateTotalPersons(bookingData),
+      numNights: parseInt(String(numNights)) || 0,  // Force integer
+      totalPersons: parseInt(String(calculateTotalPersons(bookingData))) || 0,  // Force integer
       totalCharges: totalCharges.toString(),
       totalPayments: totalPayments.toString(),
       balance: balance.toString(),
@@ -176,18 +170,13 @@ export async function processSingleBookingData(bookingData: any): Promise<{
       BDStatus: bdStatus || 'Confirmed',
     };
 
-    logger.info({ bookingId }, '📝 PROCESS STEP 5: Creating common data object');
+    // Create booking object
 
     // Inteligent message handling - preserve old messages and add new ones
     const newMessages = extractMessagesFromPayload(bookingData);
     commonData.messages = await mergeMessages(bookingId, newMessages) as any;
     
-    logger.info({ 
-      bookingId, 
-      newMessagesCount: newMessages.length,
-      totalMessagesCount: commonData.messages.length,
-      preservedCount: commonData.messages.length - newMessages.length
-    }, '📨 PROCESS STEP 5.1: Messages merged with historical data');
+    // Messages merged
     
     // Validate all data before saving
     const validatedData = validateBookingData(commonData);
@@ -203,10 +192,10 @@ export async function processSingleBookingData(bookingData: any): Promise<{
       // Still try to save with validated data, but log the issues
       logger.warn({ bookingId }, 'Attempting to save despite validation errors');
     } else {
-      logger.info({ bookingId }, '✅ PROCESS STEP 5.2: Booking data validation passed');
+      // Validation passed
     }
 
-    logger.info({ bookingId }, '🔍 PROCESS STEP 6: Checking if booking exists in BD');
+    // Check if exists in DB
     
     // Sync ALL bookings to main Booking table (simplified routing)
     const existing = await prisma.booking.findUnique({
@@ -215,13 +204,9 @@ export async function processSingleBookingData(bookingData: any): Promise<{
     
     // Note: Removed 2-minute check - debounce in queue handles duplicate prevention
     
-    logger.info({ 
-      bookingId, 
-      existsInDB: !!existing,
-      willCreateNew: !existing 
-    }, '📊 PROCESS STEP 7: Database check completed');
+    // Database check completed
 
-    logger.info({ bookingId }, '💾 PROCESS STEP 8: Starting database upsert operation');
+    // Upsert to database
     
     const result = await prisma.booking.upsert({
       where: { bookingId },
@@ -270,7 +255,7 @@ export async function processSingleBookingData(bookingData: any): Promise<{
     }, `Booking data saved: ${bookingId} - ${result.guestName}`);
     
     const finalResult = { success: true, action: existing ? 'updated' : 'created', table: 'Booking' } as const;
-    logger.info({ bookingId, finalResult }, '🏁 PROCESS STEP 11: Returning success result');
+    // Return success
     
     return finalResult;
 
