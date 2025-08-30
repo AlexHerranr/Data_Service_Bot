@@ -29,36 +29,35 @@ Es una tabla **inteligente y dinámica** que unifica TODOS los contactos del neg
 | **clientName** | VARCHAR(255) | Booking/WhatsApp | Nombre del cliente |
 | **email** | VARCHAR(255) | Booking | Email de contacto |
 | **bookingId** | VARCHAR(255) | Booking | Reserva actual (si tiene) |
-| **currentStatus** | VARCHAR(50) | Calculado | Estado actual del cliente |
-| **source** | VARCHAR(50) | Booking/WhatsApp | Origen del contacto |
+| **currentStatus** | VARCHAR(50) | Booking | BDStatus exacto o "Contacto WSP" |
+| **source** | VARCHAR(50) | Booking/WhatsApp | Origen (booking/airbnb/whatsapp/direct) |
 | **profileStatus** | TEXT | **IA** | 🤖 Resumen del perfil del cliente |
 | **proximaAccion** | VARCHAR(255) | **IA** | 🤖 Siguiente acción a realizar |
 | **fechaProximaAccion** | TIMESTAMP | **IA** | 🤖 Cuándo ejecutar la acción |
 | **prioridad** | INTEGER (1-5) | **IA** | 🤖 Urgencia de atención |
 | **propertyName** | VARCHAR(255) | Booking | Propiedad reservada |
-| **arrivalDate** | DATE | Booking | Fecha de llegada |
-| **departureDate** | DATE | Booking | Fecha de salida |
+| **arrivalDate** | DATE | Booking | Fecha de llegada (solo fecha) |
+| **departureDate** | DATE | Booking | Fecha de salida (solo fecha) |
 | **lastInteraction** | TIMESTAMP | Auto | Última interacción |
-| **lastWhatsappMessage** | TEXT | WhatsApp | Último mensaje recibido |
 | **threadId** | VARCHAR(255) | WhatsApp | ID de conversación |
+| **wspLabels** | TEXT | WhatsApp | Etiquetas de WhatsApp |
 | **totalBookings** | INTEGER | Calculado | Total histórico de reservas |
-| **totalValue** | DECIMAL | Calculado | Valor total gastado |
-| **tags** | TEXT[] | Manual/IA | Etiquetas (vip, frecuente, etc) |
+| **totalValue** | INTEGER | Calculado | Valor total gastado (sin decimales) |
 | **automationEnabled** | BOOLEAN | Manual | Permite automatización |
-| **notes** | TEXT | Manual | Notas adicionales |
-| **createdAt** | TIMESTAMP | Auto | Fecha de creación |
-| **updatedAt** | TIMESTAMP | Auto | Última actualización |
+| **internalNotes** | TEXT | Manual | Notas internas del equipo |
+| **createdAt** | TIMESTAMP | Auto | Fecha de creación (YYYY-MM-DD HH:MM:SS) |
+| **updatedAt** | TIMESTAMP | Auto | Última actualización (YYYY-MM-DD HH:MM:SS) |
 
 ### Estados Posibles (currentStatus)
 
 | Estado | Descripción | Origen |
 |--------|-------------|--------|
-| **lead** | Reserva pendiente de pago | BDStatus = 'Futura Pendiente' |
-| **confirmado** | Reserva pagada, esperando llegada | BDStatus = 'Futura Confirmada' |
-| **hospedado** | Actualmente en la propiedad | Fecha llegada = HOY |
-| **completado** | Estancia finalizada | BDStatus = 'Pasada Confirmada' |
-| **cancelado** | Reserva cancelada | BDStatus LIKE '%Cancelada%' |
-| **prospecto** | Contacto sin reserva | Solo en WhatsApp |
+| **Futura Pendiente** | Reserva pendiente de pago | Directo de Booking.BDStatus |
+| **Futura Confirmada** | Reserva pagada, esperando llegada | Directo de Booking.BDStatus |
+| **Pasada Confirmada** | Estancia finalizada | Directo de Booking.BDStatus |
+| **Cancelada Futura** | Reserva futura cancelada | Directo de Booking.BDStatus |
+| **Cancelada Pasada** | Reserva pasada cancelada | Directo de Booking.BDStatus |
+| **Contacto WSP** | Contacto solo por WhatsApp | ClientView sin reserva |
 
 ## 🔄 Flujo de Sincronización
 
