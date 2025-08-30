@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
 /**
- * Script específico para sincronizar reservas
- * Desde: Agosto 1, 2025
- * Hasta: Agosto 31, 2026
+ * Script para sincronizar reservas
+ * Desde: 1 mes atrás
+ * Hasta: 1 año adelante
  */
 
 import { getBeds24Client } from './dist/providers/beds24/client.js';
@@ -11,9 +11,18 @@ import { processSingleBookingData } from './dist/providers/beds24/sync.js';
 import { connectPrisma } from './dist/infra/db/prisma.client.js';
 import { prisma } from './dist/infra/db/prisma.client.js';
 
-// FECHAS ESPECÍFICAS
-const FROM_DATE = '2025-08-01';  // 1 de Agosto 2025
-const TO_DATE = '2026-08-31';    // 31 de Agosto 2026
+// CALCULAR FECHAS AUTOMÁTICAMENTE
+const today = new Date();
+
+// 1 mes atrás
+const fromDate = new Date(today);
+fromDate.setMonth(fromDate.getMonth() - 1);
+const FROM_DATE = fromDate.toISOString().split('T')[0];
+
+// 1 año adelante
+const toDate = new Date(today);
+toDate.setFullYear(toDate.getFullYear() + 1);
+const TO_DATE = toDate.toISOString().split('T')[0];
 
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -29,10 +38,11 @@ async function syncAugustBookings() {
   try {
     console.log(`
 ╔════════════════════════════════════════════════╗
-║   SINCRONIZACIÓN: AGOSTO 2025 → AGOSTO 2026   ║
+║   SINCRONIZACIÓN: 1 MES ATRÁS → 1 AÑO ADELANTE ║
 ╚════════════════════════════════════════════════╝
 
 📅 Periodo: ${FROM_DATE} hasta ${TO_DATE}
+📅 Hoy: ${today.toISOString().split('T')[0]}
 `);
 
     // Conectar
