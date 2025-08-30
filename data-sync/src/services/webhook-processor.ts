@@ -89,7 +89,12 @@ class WebhookProcessor {
       timestamp: new Date().toISOString()
     });
 
-    try {
+    // Try up to 3 times with exponential backoff
+    const maxRetries = 3;
+    let lastError: any;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
       // Try to fetch from Beds24 API first
       const client = getBeds24Client();
       let bookingData = await client.getBooking(bookingId);
@@ -149,21 +154,45 @@ class WebhookProcessor {
         success: result.success,
         processingTimeMs: processingTime,
         debounceSaved: pending.debounceCount,
-        timestamp: new Date().toISOString()
-      });
-
-    } catch (error: any) {
-      logger.error({
-        event: 'PROCESSING_FAILED',
-        bookingId,
-        error: error.message,
-        stack: error.stack,
+        attempt: attempt,
         timestamp: new Date().toISOString()
       });
       
-      // Simple retry logic (optional)
-      // Could re-schedule with exponential backoff here
+      // Success! Exit the retry loop
+      return;
+
+    } catch (error: any) {
+      lastError = error;
+      
+      if (attempt < maxRetries) {
+        // Wait before retry: 1s, 2s, 4s
+        const retryDelay = Math.pow(2, attempt - 1) * 1000;
+        
+        logger.warn({
+          event: 'RETRY_SCHEDULED',
+          bookingId,
+          attempt,
+          maxRetries,
+          retryDelay,
+          error: error.message,
+          timestamp: new Date().toISOString()
+        });
+        
+        // Wait before retrying
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+      }
     }
+    }
+    
+    // All retries failed
+    logger.error({
+      event: 'PROCESSING_FAILED_FINAL',
+      bookingId,
+      attempts: maxRetries,
+      error: lastError?.message,
+      stack: lastError?.stack,
+      timestamp: new Date().toISOString()
+    });
   }
 
   /**
