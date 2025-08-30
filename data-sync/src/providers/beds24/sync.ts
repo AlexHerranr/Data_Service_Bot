@@ -155,7 +155,7 @@ export async function processSingleBookingData(bookingData: any): Promise<{
       propertyName: mapPropertyName(bookingData.propertyId) || bookingData.propertyName || 'Unknown Property',
       arrivalDate: formatDateSimple(bookingData.arrival) || new Date().toISOString().split('T')[0],
       departureDate: formatDateSimple(bookingData.departure) || new Date().toISOString().split('T')[0],
-      numNights,
+      numNights: Math.floor(numNights) || 0,
       totalPersons: calculateTotalPersons(bookingData),
       totalCharges: totalCharges.toString(),
       totalPayments: totalPayments.toString(),
