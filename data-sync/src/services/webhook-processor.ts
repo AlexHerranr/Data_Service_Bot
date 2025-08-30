@@ -89,12 +89,31 @@ class WebhookProcessor {
       timestamp: new Date().toISOString()
     });
 
-    // Try up to 3 times with exponential backoff
-    const maxRetries = 3;
+    // Smart retry strategy: immediate, then 10s, 20s, 30s (total 60s if all fail)
+    const retryDelays = [0, 10000, 20000, 30000]; // milliseconds
     let lastError: any;
+    let totalRetryTime = 0;
     
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    for (let attempt = 0; attempt < retryDelays.length; attempt++) {
       try {
+      // Wait before retry (except first attempt)
+      if (attempt > 0) {
+        const delay = retryDelays[attempt];
+        totalRetryTime += delay;
+        
+        logger.info({
+          event: 'RETRY_WAITING',
+          bookingId,
+          attempt: attempt + 1,
+          delaySeconds: delay / 1000,
+          totalWaitSeconds: totalRetryTime / 1000,
+          maxAttempts: retryDelays.length,
+          timestamp: new Date().toISOString()
+        });
+        
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+      
       // Try to fetch from Beds24 API first
       const client = getBeds24Client();
       let bookingData = await client.getBooking(bookingId);
@@ -154,7 +173,8 @@ class WebhookProcessor {
         success: result.success,
         processingTimeMs: processingTime,
         debounceSaved: pending.debounceCount,
-        attempt: attempt,
+        attempt: attempt + 1,
+        totalRetryTimeMs: totalRetryTime,
         timestamp: new Date().toISOString()
       });
       
@@ -164,31 +184,24 @@ class WebhookProcessor {
     } catch (error: any) {
       lastError = error;
       
-      if (attempt < maxRetries) {
-        // Wait before retry: 1s, 2s, 4s
-        const retryDelay = Math.pow(2, attempt - 1) * 1000;
-        
-        logger.warn({
-          event: 'RETRY_SCHEDULED',
-          bookingId,
-          attempt,
-          maxRetries,
-          retryDelay,
-          error: error.message,
-          timestamp: new Date().toISOString()
-        });
-        
-        // Wait before retrying
-        await new Promise(resolve => setTimeout(resolve, retryDelay));
-      }
+      // Log the error for this attempt
+      logger.warn({
+        event: 'ATTEMPT_FAILED',
+        bookingId,
+        attempt: attempt + 1,
+        error: error.message,
+        willRetry: attempt < retryDelays.length - 1,
+        timestamp: new Date().toISOString()
+      });
     }
     }
     
-    // All retries failed
+    // All retries failed after 60 seconds total
     logger.error({
       event: 'PROCESSING_FAILED_FINAL',
       bookingId,
-      attempts: maxRetries,
+      attempts: retryDelays.length,
+      totalRetrySeconds: totalRetryTime / 1000,
       error: lastError?.message,
       stack: lastError?.stack,
       timestamp: new Date().toISOString()
