@@ -56,11 +56,17 @@ async function fetchBatch(client, offset, limit = 100) {
   
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
-      const response = await client.makeRequest({
-        method: 'GET',
-        url: `/bookings?${params.toString()}`
+      const bookings = await client.getBookings({
+        arrivalFrom: fromDate.toISOString().split('T')[0],  // YYYY-MM-DD format
+        arrivalTo: toDate.toISOString().split('T')[0],      // YYYY-MM-DD format
+        modifiedFrom: fromDate.toISOString().split('T')[0], // YYYY-MM-DD format
+        offset: offset,
+        limit: limit,
+        includeInvoiceItems: true,
+        includeInfoItems: true,
+        includeMessages: true
       });
-      return response.data.data || [];
+      return bookings || [];
     } catch (error) {
       const isRateLimit = error.response?.status === 429 || 
                           error.message?.includes('rate') ||
