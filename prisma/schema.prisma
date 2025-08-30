@@ -18,10 +18,6 @@ model ClientView {
   lastActivity       DateTime  @updatedAt
   threadId           String?   // ID del thread de conversación
   threadTokenCount   Int?      @default(0) // Contador de tokens para IA
-  lastMessage        String?   // Último mensaje recibido
-  lastMessageType    String?   // Tipo: text/image/audio/video
-  unreadCount        Int?      @default(0) // Mensajes sin leer
-  isActive           Boolean?  @default(false) // Conversación activa
 }
 
 model hotel_apartments {
