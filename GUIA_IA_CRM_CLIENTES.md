@@ -1,5 +1,7 @@
 # 📚 Guía Completa: IA_CRM_Clientes
 
+*Última actualización: 29 de Agosto 2025*
+
 ## 🎯 Propósito y Visión
 
 ### ¿Qué es IA_CRM_Clientes?
@@ -9,6 +11,7 @@ Es una tabla **inteligente y dinámica** que unifica TODOS los contactos del neg
 1. **Refleja** datos de `Booking` y `ClientView`
 2. **Mantiene** información propia generada por IA
 3. **Automatiza** seguimiento y acciones comerciales
+4. **Unifica** por número de teléfono (un cliente = un registro)
 
 ### Objetivo Principal
 
@@ -17,6 +20,7 @@ Es una tabla **inteligente y dinámica** que unifica TODOS los contactos del neg
 - Gestionar el ciclo completo del cliente: desde prospecto hasta post-estancia
 - Automatizar seguimientos según el estado de cada cliente
 - Maximizar conversiones y reactivaciones mediante IA
+- Mantener un registro único por cliente sin duplicados
 
 ## 📊 Estructura de la Tabla
 
@@ -395,40 +399,68 @@ AND "updatedAt" < NOW() - INTERVAL '30 days';
 ❌ No analiza conversaciones (requiere IA externa)  
 ❌ No genera reportes (requiere dashboard)  
 
+## 📊 Estadísticas Actuales
+
+### Datos en Producción (29 Agosto 2025)
+- **Total registros:** 795
+- **Teléfonos únicos:** 795
+- **Sincronizado con Booking:** 792/792 (100%)
+- **Contactos WhatsApp:** 3
+
+### Distribución por Estado
+| Estado | Cantidad | Porcentaje |
+|--------|----------|------------|
+| Cancelada Pasada | 348 | 43.77% |
+| Pasada Confirmada | 342 | 43.02% |
+| Futura Confirmada | 51 | 6.42% |
+| Sin estado | 27 | 3.40% |
+| Futura Pendiente | 18 | 2.26% |
+| Contacto WSP | 3 | 0.38% |
+
 ## 🆘 Troubleshooting
 
-### Problema: Duplicados en CRM
+### Problema: Teléfonos faltantes en CRM
 **Solución:**
+```javascript
+// Sincronización masiva de teléfonos faltantes
+// Ejecutar: node scripts/sync-all-missing-bulk.js
+```
+
+### Problema: Duplicados en CRM
+**Nota:** Por diseño, no deberían existir duplicados ya que `phoneNumber` es UNIQUE.
 ```sql
--- Identificar duplicados
+-- Verificar integridad
 SELECT "phoneNumber", COUNT(*) 
 FROM "IA_CRM_Clientes" 
 GROUP BY "phoneNumber" 
 HAVING COUNT(*) > 1;
-
--- Limpiar duplicados (mantener el más reciente)
-DELETE FROM "IA_CRM_Clientes" a
-USING "IA_CRM_Clientes" b
-WHERE a."phoneNumber" = b."phoneNumber"
-AND a."updatedAt" < b."updatedAt";
 ```
 
 ### Problema: Triggers no funcionan
 **Verificar:**
 ```sql
 -- Ver triggers activos
-SELECT * FROM information_schema.triggers 
+SELECT trigger_name, event_manipulation, event_object_table
+FROM information_schema.triggers 
 WHERE trigger_name LIKE '%crm%';
-
--- Re-crear si necesario
--- Ejecutar: node scripts/create-crm-triggers.js
 ```
 
-### Problema: Campos IA vacíos
+### Problema: Fechas no formateadas
 **Solución:**
-- Verificar integración con IA
-- Ejecutar análisis manual
-- Revisar logs de errores
+```sql
+-- Usar la vista con fechas formateadas
+SELECT * FROM "IA_CRM_Clientes_View"
+WHERE "currentStatus" = 'Futura Pendiente';
+```
+
+## 🔧 Scripts de Mantenimiento
+
+| Script | Descripción |
+|--------|-------------|
+| `sync-all-missing-bulk.js` | Sincroniza todos los teléfonos faltantes |
+| `create-crm-triggers.js` | Crea/actualiza triggers de sincronización |
+| `finalize-crm-structure.js` | Ajusta estructura y columnas |
+| `cleanup-old-tables.js` | Elimina tablas antiguas y backups |
 
 ## 📚 Referencias
 
@@ -439,6 +471,7 @@ WHERE trigger_name LIKE '%crm%';
 ---
 
 **Última actualización:** 29 de Agosto 2025  
-**Versión:** 1.0  
-**Autor:** Sistema de Documentación Automática  
+**Versión:** 2.0  
+**Autor:** Sistema de Gestión CRM
+**Estado:** ✅ Producción - 100% Sincronizado  
 **Estado:** ✅ En Producción
