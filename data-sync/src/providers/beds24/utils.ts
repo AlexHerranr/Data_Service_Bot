@@ -422,9 +422,14 @@ export function mapPropertyName(propertyId: number | string): string | null {
   // TODO: Implement property mapping based on your configuration
   // This could be a lookup table or API call
   const propertyMap: Record<string, string> = {
-    '1': 'Property 1',
-    '2': 'Property 2',
-    // Add your property mappings here
+    '173207': '2005-A',
+    '173307': '1820',
+    '173308': '1317',
+    '173309': '1722-B',
+    '173311': '2005-B',
+    '173312': '1722-A',
+    '240061': '0715',
+    // Mapped from Beds24 API on 2025-08-30
   };
   
   return propertyMap[String(propertyId)] || null;
