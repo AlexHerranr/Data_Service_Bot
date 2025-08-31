@@ -121,3 +121,43 @@ model IA_CRM_Clientes {
   @@index([fechaProximaAccion, prioridad])
   @@index([currentStatus])
 }
+
+// Tabla maestra de Contactos - Unifica Booking y ClientView
+model Contactos {
+  id                 Int       @id @default(autoincrement())
+  phoneNumber        String    @unique @db.VarChar(50)
+  name               String?
+  email              String?
+  
+  // Datos de WhatsApp
+  whatsappChatId     String?   @unique
+  whatsappLabels     String?
+  lastWhatsappMsg    DateTime?
+  hasWhatsapp        Boolean   @default(false)
+  
+  // Contadores de reservas
+  totalBookings      Int       @default(0)
+  confirmedBookings  Int       @default(0)
+  pendingBookings    Int       @default(0)
+  cancelledBookings  Int       @default(0)
+  
+  // Datos de reservas
+  lastCheckIn        DateTime? @db.Date
+  nextCheckIn        DateTime? @db.Date
+  totalSpent         Decimal   @default(0) @db.Decimal(12, 2)
+  
+  // Consolidado
+  lastActivity       DateTime?
+  source             String[]
+  status             String    @default("active")
+  
+  // Metadata
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  syncErrors         Int       @default(0)
+  
+  @@index([phoneNumber])
+  @@index([lastActivity])
+  @@index([status])
+  @@index([hasWhatsapp])
+}
