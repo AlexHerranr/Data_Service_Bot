@@ -1,0 +1,22 @@
+{
+  "name": "google-contacts-sync",
+  "version": "1.0.0",
+  "description": "Sincronización de contactos con Google People API",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "setup": "node setup-google-auth.js",
+    "test": "node test-connection.js",
+    "sync": "node sync-contacts.js",
+    "import": "node import-to-google.js"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.8.0",
+    "dotenv": "^16.3.1",
+    "googleapis": "^128.0.0",
+    "node-cron": "^3.0.3"
+  },
+  "devDependencies": {
+    "prisma": "^5.8.0"
+  }
+}

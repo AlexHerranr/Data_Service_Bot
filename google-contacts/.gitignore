@@ -1,0 +1,18 @@
+# Credenciales de Google (NUNCA subir a Git)
+credentials.json
+token.json
+
+# Archivos temporales
+*.tmp
+*.log
+
+# Node modules
+node_modules/
+
+# Archivos de respaldo
+*.backup
+*.bak
+
+# Archivos de sincronización
+sync-queue.json
+sync-log.json
