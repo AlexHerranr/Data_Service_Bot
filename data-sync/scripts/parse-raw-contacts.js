@@ -5,8 +5,16 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Read the raw contact data
-const rawData = fs.readFileSync(path.join(__dirname, '../raw-contacts.txt'), 'utf-8');
+// Read the raw contact data - check for full file first, then fallback
+const rawFilePath = fs.existsSync(path.join(__dirname, '../raw-contacts-full.txt')) 
+    ? path.join(__dirname, '../raw-contacts-full.txt')
+    : path.join(__dirname, '../raw-contacts.txt');
+
+console.log(`📂 Leyendo archivo: ${path.basename(rawFilePath)}`);
+const fileStats = fs.statSync(rawFilePath);
+console.log(`📊 Tamaño del archivo: ${(fileStats.size / 1024 / 1024).toFixed(2)} MB`);
+
+const rawData = fs.readFileSync(rawFilePath, 'utf-8');
 
 // Parse contacts into structured data
 function parseContacts(data) {
