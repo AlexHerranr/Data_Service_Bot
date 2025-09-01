@@ -47,10 +47,51 @@ async function main() {
     // Continue startup even if Beds24 init fails (READ operations still work)
   }
 
+  // Clean old jobs before starting worker
+  logger.info('🧹 Cleaning old jobs from queue...');
+  const { beds24Queue } = await import('./infra/queues/queue.manager.js');
+  
+  // Remove all delayed jobs older than 5 minutes
+  const delayedJobs = await beds24Queue.getDelayed();
+  let removedCount = 0;
+  for (const job of delayedJobs) {
+    const jobAge = Date.now() - job.timestamp;
+    if (jobAge > 5 * 60 * 1000) { // Older than 5 minutes
+      await job.remove();
+      removedCount++;
+      logger.info({ 
+        jobId: job.id, 
+        age: Math.floor(jobAge / 1000) + 's' 
+      }, `Removed old delayed job: ${job.id}`);
+    }
+  }
+  
+  if (removedCount > 0) {
+    logger.info({ count: removedCount }, `Cleaned ${removedCount} old delayed jobs`);
+  }
+  
   // Initialize BullMQ worker
   logger.info('🔄 Starting BullMQ worker...');
   // Worker is already initialized by importing from queue.manager.js
   logger.info('✅ BullMQ worker started successfully');
+  
+  // Debug: Check worker status every 30 seconds
+  setInterval(async () => {
+    const { beds24Queue } = await import('./infra/queues/queue.manager.js');
+    const waiting = await beds24Queue.getWaitingCount();
+    const active = await beds24Queue.getActiveCount();
+    const completed = await beds24Queue.getCompletedCount();
+    const failed = await beds24Queue.getFailedCount();
+    
+    logger.info({
+      event: 'QUEUE_STATUS_CHECK',
+      waiting,
+      active,
+      completed,
+      failed,
+      timestamp: new Date().toISOString()
+    }, `Queue status - Waiting: ${waiting}, Active: ${active}, Completed: ${completed}, Failed: ${failed}`);
+  }, 30000);
   
   // Routes
   const router = express.Router();

@@ -1,0 +1,43 @@
+// Modelo para la tabla maestra de Contactos
+// Consolida datos de ClientView (WhatsApp) y Booking
+
+model Contactos {
+  id                 Int       @id @default(autoincrement())
+  phoneNumber        String    @unique // Formato normalizado: +573123456789
+  
+  // INFORMACIÓN BÁSICA
+  name               String?   // Prioridad: Booking > ClientView
+  email              String?   // Solo de Booking
+  
+  // DATOS DE WHATSAPP (desde ClientView)
+  whatsappChatId     String?   @unique
+  whatsappLabels     String?   
+  lastWhatsappMsg    DateTime?
+  hasWhatsapp        Boolean   @default(false)
+  
+  // CONTADORES DE RESERVAS (desde Booking)
+  totalBookings      Int       @default(0)
+  confirmedBookings  Int       @default(0)
+  pendingBookings    Int       @default(0)
+  cancelledBookings  Int       @default(0) // Agregado para completitud
+  
+  // DATOS DE RESERVAS
+  lastCheckIn        DateTime? @db.Date
+  nextCheckIn        DateTime? @db.Date
+  totalSpent         Decimal   @default(0) @db.Decimal(12, 2)
+  
+  // CONSOLIDADO
+  lastActivity       DateTime?
+  source             String[]  // ['whatsapp', 'booking', 'manual']
+  status             String    @default("active") // 'active', 'inactive', 'archived'
+  
+  // METADATA
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  syncErrors         Int       @default(0) // Contador de errores de sincronización
+  
+  @@index([phoneNumber])
+  @@index([lastActivity])
+  @@index([status])
+  @@index([hasWhatsapp])
+}

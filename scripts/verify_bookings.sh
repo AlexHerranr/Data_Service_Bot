@@ -1,0 +1,18 @@
+#!/bin/bash
+
+echo "=== VERIFICANDO RESERVAS EN RAILWAY ==="
+echo ""
+echo "Necesitas ejecutar estos comandos en Railway CLI o en la consola de Railway:"
+echo ""
+echo "1. Para verificar la reserva 74941539:"
+echo "   railway run --service=postgres psql -c \"SELECT bookingId, guestName, status, propertyName, arrivalDate, departureDate, totalPersons, channel, bookingDate, modifiedDate, lastUpdatedBD FROM \\\"Booking\\\" WHERE \\\"bookingId\\\" = '74941539';\""
+echo ""
+echo "2. Para verificar la reserva 74943974:"
+echo "   railway run --service=postgres psql -c \"SELECT bookingId, guestName, status, propertyName, arrivalDate, departureDate, totalPersons, channel, bookingDate, modifiedDate, lastUpdatedBD FROM \\\"Booking\\\" WHERE \\\"bookingId\\\" = '74943974';\""
+echo ""
+echo "3. Para ver las últimas 5 reservas modificadas:"
+echo "   railway run --service=postgres psql -c \"SELECT bookingId, guestName, status, propertyName, lastUpdatedBD FROM \\\"Booking\\\" ORDER BY \\\"lastUpdatedBD\\\" DESC LIMIT 5;\""
+echo ""
+echo "4. Para ver los cargos de la reserva 74943974:"
+echo "   railway run --service=postgres psql -c \"SELECT bookingId, charges, payments, totalCharges, totalPayments, balance FROM \\\"Booking\\\" WHERE \\\"bookingId\\\" = '74943974';\""
+echo ""

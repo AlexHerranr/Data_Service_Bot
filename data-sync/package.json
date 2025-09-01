@@ -28,15 +28,21 @@
     "update:messages:specific": "tsx scripts/update-all-messages.ts",
     "test:railway-token": "tsx scripts/test-railway-token.ts",
     "create:test-booking": "tsx scripts/create-test-booking.ts",
+    "sync:all-bookings": "node dist/scripts/sync-all-bookings.js",
+    "sync:modified": "node dist/scripts/update-modified-bookings.js",
+    "sync:quick": "node dist/scripts/update-modified-bookings.js 2",
+    "sync:complete": "node dist/scripts/sync-complete-period.js",
+    "sync:optimized": "node dist/scripts/sync-optimized.js",
+    "sync:smart": "node dist/scripts/sync-with-rate-limit.js",
     "typecheck": "npx tsc --noEmit",
     "test-build": "npm run typecheck && npm run build"
   },
   "dependencies": {
     "@bull-board/express": "^6.12.0",
-    "@prisma/client": "^6.14.0",
+    "@prisma/client": "^6.15.0",
     "axios": "^1.7.2",
     "bullmq": "^5.57.0",
-    "dotenv": "^16.4.5",
+    "dotenv": "^16.6.1",
     "express": "^4.19.2",
     "express-prom-bundle": "^8.0.0",
     "ioredis": "^5.7.0",
@@ -47,7 +53,6 @@
     "shx": "^0.4.0",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
-    "typescript": "^5.5.4",
     "yargs": "^18.0.0",
     "zod": "^3.23.8"
   },
@@ -56,6 +61,7 @@
     "@types/swagger-jsdoc": "^6.0.4",
     "@types/swagger-ui-express": "^4.1.8",
     "tsx": "^4.20.4",
+    "typescript": "^5.9.2",
     "vitest": "^2.0.5"
   }
 }

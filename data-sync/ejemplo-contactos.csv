@@ -1,0 +1,9 @@
+name,phone,email,notes
+Juan Pérez,3001234567,juan@email.com,Cliente VIP
+María García,573112223333,maria@gmail.com,Contacto de Google
+Carlos López,3209876543,,Sin email
+Ana Rodríguez,+573145556666,ana@empresa.com,Importado
+Pedro Martínez,300-888-9999,pedro@test.com,Formato con guiones
+Laura Sánchez,(57) 311 777 8888,laura@correo.com,Formato con paréntesis
+,3187776655,,Solo teléfono sin nombre
+Test Internacional,+34612345678,test@spain.com,Número de España

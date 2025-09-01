@@ -1,0 +1,139 @@
+generator client {
+  provider      = "prisma-client-js"
+  output        = "../data-sync/node_modules/.prisma/client"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Chats {
+  phoneNumber        String    @id
+  name               String?
+  userName           String?
+  labels             String?
+  chatId             String?   @unique
+  lastActivity       DateTime  @updatedAt
+  threadId           String?
+  threadTokenCount   Int?      @default(0)
+}
+
+model Propiedades {
+  id          Int    @id @default(autoincrement())
+  propertyId  Int    @map("property_id")
+  roomId      Int    @unique @map("room_id")
+  roomName    String @map("room_name")
+  extraCharge Json   @default("{\"amount\": 70000, \"description\": \"Cargo adicional:\"}") @map("extra_charge")
+  capacity    Int    @default(4)
+}
+
+model Reservas {
+  id            Int      @id @default(autoincrement())
+  bookingId     String   @unique
+  phone         String?
+  guestName     String?
+  status        String?
+  internalNotes String?
+  propertyName  String?
+  arrivalDate   String?
+  departureDate String?
+  numNights     Int?
+  totalPersons  Int?
+  totalCharges  String?
+  totalPayments String?
+  balance       String?
+  basePrice     String?
+  channel       String?
+  email         String?
+  apiReference  String?
+  charges       Json     @default("[]")
+  payments      Json     @default("[]")
+  messages      Json     @default("[]")
+  infoItems     Json     @default("[]")
+  notes         String?
+  bookingDate   String?
+  modifiedDate  String?
+  lastUpdatedBD DateTime @default(now())
+  raw           Json?
+  BDStatus      String?
+
+  @@index([arrivalDate])
+  @@index([bookingId])
+  @@index([channel])
+  @@index([departureDate])
+  @@index([guestName])
+  @@index([modifiedDate])
+  @@index([phone])
+  @@index([propertyName, departureDate])
+  @@index([status])
+}
+
+model Oportunidades {
+  id            Int      @id @default(autoincrement())
+  bookingId     String   @unique
+  guestName     String
+  phone         String
+  propertyName  String
+  arrivalDate   DateTime @db.Date
+  departureDate DateTime @db.Date
+  numNights     Int
+  totalPersons  Int
+  channel       String
+  createdAt     DateTime @default(now())
+
+  @@index([arrivalDate])
+  @@index([phone])
+  @@index([channel])
+  @@index([propertyName, arrivalDate])
+}
+
+model CRM {
+  id                 Int       @id @default(autoincrement())
+  phoneNumber        String    @unique
+  clientName         String?
+  email              String?
+  bookingId          String?
+  currentStatus      String?
+  source             String?
+  profileStatus      String?
+  proximaAccion      String?
+  fechaProximaAccion DateTime?
+  prioridad          Int?      @default(3)
+  propertyName       String?
+  arrivalDate        DateTime? @db.Date
+  departureDate      DateTime? @db.Date
+  lastInteraction    DateTime?
+  threadId           String?
+  wspLabels          String?
+  totalBookings      Int       @default(0)
+  totalValue         Int?      @default(0)
+  automationEnabled  Boolean   @default(true)
+  internalNotes      String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @default(now())
+
+  @@index([phoneNumber])
+  @@index([fechaProximaAccion, prioridad])
+  @@index([currentStatus])
+}
+
+// NUEVA ESTRUCTURA SIMPLIFICADA DE CLIENTES
+model Clientes {
+  id              Int       @id @default(autoincrement())
+  telefono        String    @unique @db.VarChar(50)
+  nombre          String?
+  email           String?
+  notas           Json?     @default("{}") // JSON con múltiples fuentes
+  etiquetas       String[]  // Array de etiquetas de WhatsApp
+  totalReservas   Int       @default(0) @map("total_reservas")
+  ultimaActividad DateTime? @map("ultima_actividad")
+  estado          String?   // Estado dinámico según fuente
+  creadoEn        DateTime  @default(now()) @map("creado_en")
+  actualizadoEn   DateTime  @updatedAt @map("actualizado_en")
+  
+  @@index([telefono])
+  @@index([estado])
+  @@index([ultimaActividad])
+}

@@ -18,6 +18,8 @@ import {
   extractMessages,
   mapPropertyName
 } from './utils.js';
+import { validateBookingData, isValidBooking } from './validators.js';
+import { mergeMessages, extractMessagesFromPayload } from './message-handler.js';
 import { prisma } from '../../infra/db/prisma.client.js';
 import { logger } from '../../utils/logger.js';
 
@@ -142,7 +144,7 @@ export async function processSingleBookingData(bookingData: any): Promise<{
       apiReference: bookingData.apiReference || null,
       charges: charges,
       payments: payments,
-      messages: extractMessages(bookingData),
+      messages: [], // Se llenará después con merge
       infoItems,
       notes: bookingData.comments || 'no notes',
       bookingDate: formatDateSimple(bookingData.created || bookingData.bookingTime),
@@ -154,10 +156,32 @@ export async function processSingleBookingData(bookingData: any): Promise<{
 
     logger.info({ bookingId }, '📝 PROCESS STEP 5: Creating common data object');
 
-    // Enhanced message handling for MODIFY actions
-    if (bookingData.action === 'MODIFY' || bookingData.action === 'modified') {
-      commonData.messages = extractMessages(bookingData);
-      logger.debug({ bookingId, messageCount: commonData.messages?.length || 0 }, 'Enhanced message extraction for MODIFY action');
+    // Inteligent message handling - preserve old messages and add new ones
+    const newMessages = extractMessagesFromPayload(bookingData);
+    commonData.messages = await mergeMessages(bookingId, newMessages) as any;
+    
+    logger.info({ 
+      bookingId, 
+      newMessagesCount: newMessages.length,
+      totalMessagesCount: commonData.messages.length,
+      preservedCount: commonData.messages.length - newMessages.length
+    }, '📨 PROCESS STEP 5.1: Messages merged with historical data');
+    
+    // Validate all data before saving
+    const validatedData = validateBookingData(commonData);
+    const validation = isValidBooking(validatedData);
+    
+    if (!validation.valid) {
+      logger.error({ 
+        bookingId, 
+        errors: validation.errors,
+        data: validatedData 
+      }, '❌ PROCESS STEP 5.1: Booking data validation failed');
+      
+      // Still try to save with validated data, but log the issues
+      logger.warn({ bookingId }, 'Attempting to save despite validation errors');
+    } else {
+      logger.info({ bookingId }, '✅ PROCESS STEP 5.2: Booking data validation passed');
     }
 
     logger.info({ bookingId }, '🔍 PROCESS STEP 6: Checking if booking exists in BD');
@@ -166,6 +190,20 @@ export async function processSingleBookingData(bookingData: any): Promise<{
     const existing = await prisma.booking.findUnique({
       where: { bookingId }
     });
+    
+    // Check if booking was recently updated (within last 2 minutes)
+    if (existing && existing.lastUpdatedBD) {
+      const timeSinceLastUpdate = Date.now() - new Date(existing.lastUpdatedBD).getTime();
+      if (timeSinceLastUpdate < 2 * 60 * 1000) { // Less than 2 minutes
+        logger.warn({ 
+          bookingId,
+          lastUpdatedBD: existing.lastUpdatedBD,
+          secondsSinceUpdate: Math.floor(timeSinceLastUpdate / 1000)
+        }, 'Booking was recently updated - skipping to avoid duplicate processing');
+        
+        return { success: true, action: 'skipped-recent', table: 'Booking' } as const;
+      }
+    }
     
     logger.info({ 
       bookingId, 
@@ -177,29 +215,49 @@ export async function processSingleBookingData(bookingData: any): Promise<{
     
     const result = await prisma.booking.upsert({
       where: { bookingId },
-      create: commonData,
+      create: validatedData,
       update: {
-        ...commonData,
+        ...validatedData,
         id: undefined, // Don't update ID
       },
     });
     
+    // Database operation result logging
+    const dbAction = existing ? 'UPDATE' : 'INSERT';
+    
+    // Critical log for database confirmation
     logger.info({ 
-      bookingId, 
-      dbResultId: result.id,
-      wasCreated: !existing
-    }, '✅ PROCESS STEP 9: Database upsert completed');
+      event: 'DB_OPERATION_SUCCESS',
+      operation: 'UPSERT',
+      action: dbAction,
+      bookingId: bookingId,
+      dbId: result.id,
+      wasExisting: !!existing,
+      timestamp: new Date().toISOString()
+    }, `Database ${dbAction} completed for booking ${bookingId}`);
 
+    // Detailed booking data for verification
     logger.info({ 
-      bookingId, 
-      action: existing ? 'updated' : 'created',
-      table: 'Booking',
-      resultId: result.id,
+      event: 'BOOKING_DATA_SAVED',
+      bookingId: bookingId,
+      dbId: result.id,
       guestName: result.guestName,
-      phone: result.phone,
+      propertyName: result.propertyName,
       status: result.status,
-      bdStatus: result.BDStatus
-    }, '🎉 PROCESS STEP 10: Successfully synced to BD - Booking table');
+      bdStatus: result.BDStatus,
+      arrivalDate: result.arrivalDate,
+      departureDate: result.departureDate,
+      numNights: result.numNights,
+      totalPersons: result.totalPersons,
+      totalCharges: result.totalCharges,
+      totalPayments: result.totalPayments,
+      balance: result.balance,
+      phone: result.phone || null,
+      email: result.email || null,
+      channel: result.channel,
+      lastUpdatedBD: result.lastUpdatedBD,
+      timestamp: new Date().toISOString()
+    }, `Booking data saved: ${bookingId} - ${result.guestName}`);
     
     const finalResult = { success: true, action: existing ? 'updated' : 'created', table: 'Booking' } as const;
     logger.info({ bookingId, finalResult }, '🏁 PROCESS STEP 11: Returning success result');
@@ -208,18 +266,19 @@ export async function processSingleBookingData(bookingData: any): Promise<{
 
   } catch (error: any) {
     const bookingId = (bookingData?.bookingId || bookingData?.id)?.toString() || 'unknown';
+    
+    // Structured error logging
     logger.error({ 
-      bookingId,
-      error: error.message, 
+      event: 'DB_OPERATION_FAILED',
+      bookingId: bookingId,
+      errorCode: error.code || 'UNKNOWN',
+      errorMessage: error.message,
+      errorType: error.code === 'P2002' ? 'UNIQUE_CONSTRAINT_VIOLATION' : 'DATABASE_ERROR',
       stack: error.stack,
-      data: bookingData,
-      constraint: error.code === 'P2002' ? 'unique_constraint' : error.code
-    }, '💥 PROCESS ERROR: Failed to sync to BD - check constraints and data');
+      timestamp: new Date().toISOString()
+    }, `Database operation failed for booking ${bookingId}: ${error.message}`);
     
-    const errorResult = { success: false, action: 'skipped', table: 'Booking' } as const;
-    logger.info({ bookingId, errorResult }, '🚫 PROCESS STEP 12: Returning error result');
-    
-    return errorResult;
+    return { success: false, action: 'skipped', table: 'Booking' } as const;
   }
 }
 

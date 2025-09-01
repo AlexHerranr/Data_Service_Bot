@@ -1,0 +1,161 @@
+generator client {
+  provider      = "prisma-client-js"
+  output        = "../data-sync/node_modules/.prisma/client"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Chats {
+  phoneNumber        String    @id
+  name               String?
+  userName           String?
+  labels             String?   // Etiquetas de WhatsApp
+  chatId             String?   @unique
+  lastActivity       DateTime  @updatedAt
+  threadId           String?   // ID del thread de conversación
+  threadTokenCount   Int?      @default(0) // Contador de tokens para IA
+}
+
+model Propiedades {
+  id          Int    @id @default(autoincrement())
+  propertyId  Int    @map("property_id")
+  roomId      Int    @unique @map("room_id")
+  roomName    String @map("room_name")
+  extraCharge Json   @default("{\"amount\": 70000, \"description\": \"Cargo adicional:\"}") @map("extra_charge")
+  capacity    Int    @default(4)
+}
+
+model Reservas {
+  id            Int      @id @default(autoincrement())
+  bookingId     String   @unique
+  phone         String?
+  guestName     String?
+  status        String?
+  internalNotes String?
+  propertyName  String?
+  arrivalDate   String?
+  departureDate String?
+  numNights     Int?
+  totalPersons  Int?
+  totalCharges  String?
+  totalPayments String?
+  balance       String?
+  basePrice     String?
+  channel       String?
+  email         String?
+  apiReference  String?
+  charges       Json     @default("[]")
+  payments      Json     @default("[]")
+  messages      Json     @default("[]")
+  infoItems     Json     @default("[]")
+  notes         String?
+  bookingDate   String?
+  modifiedDate  String?
+  lastUpdatedBD DateTime @default(now())
+  raw           Json?
+  BDStatus      String?
+
+  @@index([arrivalDate])
+  @@index([bookingId])
+  @@index([channel])
+  @@index([departureDate])
+  @@index([guestName])
+  @@index([modifiedDate])
+  @@index([phone])
+  @@index([propertyName, departureDate])
+  @@index([status])
+}
+
+// Tabla de Oportunidades - Solo reservas pendientes de confirmar
+model Oportunidades {
+  id            Int      @id @default(autoincrement())
+  bookingId     String   @unique
+  guestName     String
+  phone         String
+  propertyName  String
+  arrivalDate   DateTime @db.Date
+  departureDate DateTime @db.Date
+  numNights     Int
+  totalPersons  Int
+  channel       String
+  createdAt     DateTime @default(now())
+
+  @@index([arrivalDate])
+  @@index([phone])
+  @@index([channel])
+  @@index([propertyName, arrivalDate])
+}
+
+model CRM {
+  id                 Int       @id @default(autoincrement())
+  phoneNumber        String    @unique
+  clientName         String?
+  email              String?
+  bookingId          String?
+  currentStatus      String?   // BDStatus de Reservas o "Contacto WSP"
+  source             String?
+  profileStatus      String?   // Para IA: perfil del cliente
+  proximaAccion      String?   // Para IA: siguiente acción
+  fechaProximaAccion DateTime? // Para IA: cuándo hacer la acción
+  prioridad          Int?      @default(3)
+  propertyName       String?
+  arrivalDate        DateTime? @db.Date
+  departureDate      DateTime? @db.Date
+  lastInteraction    DateTime?
+  threadId           String?   // ID de conversación WhatsApp
+  wspLabels          String?   // Etiquetas de WhatsApp
+  totalBookings      Int       @default(0)
+  totalValue         Int?      @default(0) // Sin decimales
+  automationEnabled  Boolean   @default(true)
+  internalNotes      String?   // Notas internas del equipo
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @default(now())
+
+  @@index([phoneNumber])
+  @@index([fechaProximaAccion, prioridad])
+  @@index([currentStatus])
+}
+
+// Tabla maestra de Clientes - Unifica Reservas y Chats
+model Clientes {
+  id                 Int       @id @default(autoincrement())
+  phoneNumber        String    @unique @db.VarChar(50)
+  name               String?
+  email              String?
+  
+  // Datos de WhatsApp
+  whatsappChatId     String?   @unique
+  whatsappLabels     String?
+  lastWhatsappMsg    DateTime?
+  hasWhatsapp        Boolean   @default(false)
+  
+  // Contadores de reservas
+  totalBookings      Int       @default(0)
+  confirmedBookings  Int       @default(0)
+  pendingBookings    Int       @default(0)
+  cancelledBookings  Int       @default(0)
+  
+  // Datos de reservas
+  lastCheckIn        DateTime? @db.Date
+  nextCheckIn        DateTime? @db.Date
+  totalSpent         Decimal   @default(0) @db.Decimal(12, 2)
+  
+  // Consolidado
+  lastActivity       DateTime?
+  source             String[]
+  status             String    @default("active")
+  
+  // Metadata
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  syncErrors         Int       @default(0)
+  
+  @@index([phoneNumber])
+  @@index([lastActivity])
+  @@index([status])
+  @@index([hasWhatsapp])
+}
