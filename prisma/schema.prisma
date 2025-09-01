@@ -130,10 +130,12 @@ model Clientes {
   totalReservas   Int       @default(0) @map("total_reservas")
   ultimaActividad DateTime? @map("ultima_actividad")
   estado          String?   // Estado dinámico según fuente
+  googleResourceId String?  @map("google_resource_id") // ID del contacto en Google
   creadoEn        DateTime  @default(now()) @map("creado_en")
   actualizadoEn   DateTime  @updatedAt @map("actualizado_en")
   
   @@index([telefono])
   @@index([estado])
   @@index([ultimaActividad])
+  @@index([googleResourceId])
 }
