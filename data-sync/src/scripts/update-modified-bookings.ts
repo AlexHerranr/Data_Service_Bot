@@ -82,7 +82,7 @@ export async function updateModifiedBookings(options: UpdateOptions = {}) {
           stats.checked++;
           
           // Verificar si necesita actualización
-          const existing = await prisma.booking.findUnique({
+          const existing = await prisma.reservas.findUnique({
             where: { bookingId: String(booking.id) },
             select: { 
               id: true, 

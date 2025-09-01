@@ -102,7 +102,7 @@ export async function syncOptimized(): Promise<SyncStats> {
     // PASO 1: Obtener TODAS las reservas existentes en BD
     logger.info('📊 PASO 1: Analizando BD actual...');
     
-    const existingBookings = await prisma.booking.findMany({
+    const existingBookings = await prisma.reservas.findMany({
       select: { 
         bookingId: true,
         modifiedDate: true
@@ -110,7 +110,7 @@ export async function syncOptimized(): Promise<SyncStats> {
     });
     
     const existingMap = new Map(
-      existingBookings.map(b => [b.bookingId, b.modifiedDate])
+      existingBookings.map((b: any) => [b.bookingId, b.modifiedDate])
     );
     stats.existingInDB = existingMap.size;
     
@@ -161,7 +161,7 @@ export async function syncOptimized(): Promise<SyncStats> {
           const booking = toCreate[i];
           const bookingData = transformBookingData(booking);
           
-          await prisma.booking.create({
+          await prisma.reservas.create({
             data: bookingData
           });
           
@@ -195,7 +195,7 @@ export async function syncOptimized(): Promise<SyncStats> {
           const newModified = booking.modifiedTime ? booking.modifiedTime.split('T')[0] : null;
           
           if (!existingModified || existingModified !== newModified) {
-            await prisma.booking.update({
+            await prisma.reservas.update({
               where: { bookingId },
               data: {
                 ...bookingData,
@@ -248,7 +248,7 @@ export async function syncOptimized(): Promise<SyncStats> {
     }
     
     // Verificación final
-    const finalCount = await prisma.booking.count();
+    const finalCount = await prisma.reservas.count();
     logger.info('=' .repeat(60));
     logger.info(`📊 TOTAL FINAL EN BD: ${finalCount} reservas`);
     logger.info('=' .repeat(60));

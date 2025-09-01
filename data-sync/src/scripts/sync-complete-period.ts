@@ -44,7 +44,7 @@ export async function syncCompletePeriod(): Promise<SyncStats> {
     // PASO 1: Obtener TODAS las reservas existentes en BD
     logger.info('📊 PASO 1: Analizando BD actual...');
     
-    const existingBookings = await prisma.booking.findMany({
+    const existingBookings = await prisma.reservas.findMany({
       select: { 
         bookingId: true,
         guestName: true,
@@ -53,7 +53,7 @@ export async function syncCompletePeriod(): Promise<SyncStats> {
       }
     });
     
-    const existingIds = new Set(existingBookings.map(b => b.bookingId));
+    const existingIds = new Set(existingBookings.map((b: any) => b.bookingId));
     stats.existingInDB = existingIds.size;
     
     logger.info(`📊 Reservas actuales en BD: ${stats.existingInDB}`);
@@ -207,7 +207,7 @@ export async function syncCompletePeriod(): Promise<SyncStats> {
     }
     
     // Verificación final
-    const finalCount = await prisma.booking.count();
+    const finalCount = await prisma.reservas.count();
     logger.info('=' .repeat(60));
     logger.info(`📊 TOTAL FINAL EN BD: ${finalCount} reservas`);
     logger.info('=' .repeat(60));

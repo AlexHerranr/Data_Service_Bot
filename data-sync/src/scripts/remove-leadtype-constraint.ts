@@ -139,7 +139,7 @@ async function removeLeadTypeConstraint() {
     logger.info('🧪 Probando inserción sin leadType...');
     
     try {
-      const testBooking = await prisma.booking.create({
+      const testBooking = await prisma.reservas.create({
         data: {
           bookingId: `test-${Date.now()}`,
           guestName: 'Test Sin LeadType',
@@ -153,7 +153,7 @@ async function removeLeadTypeConstraint() {
       logger.info(`✅ Inserción de prueba exitosa: ${testBooking.bookingId}`);
       
       // Limpiar el registro de prueba
-      await prisma.booking.delete({
+      await prisma.reservas.delete({
         where: { bookingId: testBooking.bookingId }
       });
       logger.info('🧹 Registro de prueba eliminado');

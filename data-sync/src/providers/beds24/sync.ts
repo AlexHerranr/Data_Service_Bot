@@ -187,7 +187,7 @@ export async function processSingleBookingData(bookingData: any): Promise<{
     logger.info({ bookingId }, '🔍 PROCESS STEP 6: Checking if booking exists in BD');
     
     // Sync ALL bookings to main Booking table (simplified routing)
-    const existing = await prisma.booking.findUnique({
+    const existing = await prisma.reservas.findUnique({
       where: { bookingId }
     });
     
@@ -201,7 +201,7 @@ export async function processSingleBookingData(bookingData: any): Promise<{
           secondsSinceUpdate: Math.floor(timeSinceLastUpdate / 1000)
         }, 'Booking was recently updated - skipping to avoid duplicate processing');
         
-        return { success: true, action: 'skipped-recent', table: 'Booking' } as const;
+        return { success: true, action: 'skipped' as const, table: 'Booking' };
       }
     }
     
@@ -213,7 +213,7 @@ export async function processSingleBookingData(bookingData: any): Promise<{
 
     logger.info({ bookingId }, '💾 PROCESS STEP 8: Starting database upsert operation');
     
-    const result = await prisma.booking.upsert({
+    const result = await prisma.reservas.upsert({
       where: { bookingId },
       create: validatedData,
       update: {
@@ -291,11 +291,11 @@ async function syncCancelledBooking(bookingData: any): Promise<{
   table: 'ReservationsCancelled';
 }> {
   try {
-    const existing = await prisma.booking.findUnique({
+    const existing = await prisma.reservas.findUnique({
       where: { bookingId: bookingData.bookingId }
     });
 
-    await prisma.booking.upsert({
+    await prisma.reservas.upsert({
       where: { bookingId: bookingData.bookingId },
       create: {
         ...bookingData,
@@ -327,11 +327,11 @@ async function syncActiveBooking(bookingData: any): Promise<{
 }> {
   try {
     // Always sync to main Booking table first
-    const existingBooking = await prisma.booking.findUnique({
+    const existingBooking = await prisma.reservas.findUnique({
       where: { bookingId: bookingData.bookingId }
     });
 
-    const activeResult = await prisma.booking.upsert({
+    const activeResult = await prisma.reservas.upsert({
       where: { bookingId: bookingData.bookingId },
       create: bookingData,
       update: {

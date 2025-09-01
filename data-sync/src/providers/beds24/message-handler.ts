@@ -25,7 +25,7 @@ export async function mergeMessages(
 ): Promise<Message[]> {
   try {
     // Obtener mensajes existentes de la BD
-    const existingBooking = await prisma.booking.findUnique({
+    const existingBooking = await prisma.reservas.findUnique({
       where: { bookingId },
       select: { messages: true }
     });
@@ -99,7 +99,7 @@ export async function hasNewMessages(
   incomingMessages: Message[]
 ): Promise<boolean> {
   try {
-    const existingBooking = await prisma.booking.findUnique({
+    const existingBooking = await prisma.reservas.findUnique({
       where: { bookingId },
       select: { messages: true }
     });
@@ -160,7 +160,7 @@ export async function getMessageStats(bookingId: string): Promise<{
   newestMessage?: Date;
 }> {
   try {
-    const booking = await prisma.booking.findUnique({
+    const booking = await prisma.reservas.findUnique({
       where: { bookingId },
       select: { messages: true }
     });

@@ -29,8 +29,8 @@ interface SyncResult {
 async function getDatabaseStats() {
   logger.info('📊 FASE 0: Analizando estado actual de la BD...');
   
-  const totalBookings = await prisma.booking.count();
-  const bookingIds = await prisma.booking.findMany({
+  const totalBookings = await prisma.reservas.count();
+  const bookingIds = await prisma.reservas.findMany({
     select: { bookingId: true, modifiedDate: true },
     orderBy: { modifiedDate: 'desc' },
     take: 5
@@ -39,7 +39,7 @@ async function getDatabaseStats() {
   const lastModified = bookingIds[0]?.modifiedDate || 'never';
   
   // Obtener rango de fechas
-  const dateRange = await prisma.booking.aggregate({
+  const dateRange = await prisma.reservas.aggregate({
     _min: { arrivalDate: true },
     _max: { departureDate: true }
   });
@@ -49,15 +49,15 @@ async function getDatabaseStats() {
     lastModified,
     earliestArrival: dateRange._min.arrivalDate,
     latestDeparture: dateRange._max.departureDate,
-    sampleIds: bookingIds.map(b => b.bookingId)
+    sampleIds: bookingIds.map((b: any) => b.bookingId)
   }, '📊 Estado actual de la BD');
   
   return {
     totalBookings,
     lastModified,
-    existingIds: new Set(await prisma.booking.findMany({
+    existingIds: new Set(await prisma.reservas.findMany({
       select: { bookingId: true }
-    }).then(books => books.map(b => b.bookingId)))
+    }).then((books: any) => books.map((b: any) => b.bookingId)))
   };
 }
 
@@ -295,7 +295,7 @@ async function syncCancelledBookings(): Promise<SyncResult> {
         result.processed++;
         
         // Verificar si existe en BD
-        const existing = await prisma.booking.findUnique({
+        const existing = await prisma.reservas.findUnique({
           where: { bookingId: String(booking.id) },
           select: { id: true, status: true }
         });
@@ -348,7 +348,7 @@ export async function executeSmartSync() {
     
     // FASE 1: Crear nuevas reservas
     logger.info('\n' + '='.repeat(60));
-    results.fase1 = await syncNewBookings(dbStats.existingIds);
+    results.fase1 = await syncNewBookings(dbStats.existingIds as Set<string>);
     logger.info(`✅ FASE 1 completada: ${results.fase1.created} creadas, ${results.fase1.errors} errores`);
     
     // FASE 2: Actualizar modificadas recientemente
@@ -384,7 +384,7 @@ export async function executeSmartSync() {
     logger.info('='.repeat(60));
     
     // Verificación final
-    const finalCount = await prisma.booking.count();
+    const finalCount = await prisma.reservas.count();
     logger.info(`📊 Total reservas en BD: ${finalCount}`);
     
     return {
