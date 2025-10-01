@@ -107,13 +107,13 @@ export async function syncWithRateLimit() {
     logger.info('='.repeat(60));
     try {
         logger.info('📊 PASO 1: Analizando BD actual...');
-        const existingBookings = await prisma.booking.findMany({
+        const existingBookings = await prisma.reservas.findMany({
             select: {
                 bookingId: true,
                 modifiedDate: true
             }
         });
-        const existingMap = new Map(existingBookings.map(b => [b.bookingId, b.modifiedDate]));
+        const existingMap = new Map(existingBookings.map((b) => [b.bookingId, b.modifiedDate]));
         stats.existingInDB = existingMap.size;
         logger.info(`📊 Reservas actuales en BD: ${stats.existingInDB}`);
         logger.info('📥 PASO 2: Descargando reservas de Beds24...');
@@ -150,7 +150,7 @@ export async function syncWithRateLimit() {
             for (const booking of toCreate) {
                 try {
                     const bookingData = transformBookingData(booking);
-                    await prisma.booking.create({
+                    await prisma.reservas.create({
                         data: bookingData
                     });
                     stats.created++;
@@ -180,7 +180,7 @@ export async function syncWithRateLimit() {
                     const existingModified = existingMap.get(bookingId);
                     const newModified = booking.modifiedTime ? booking.modifiedTime.split('T')[0] : null;
                     if (!existingModified || existingModified !== newModified) {
-                        await prisma.booking.update({
+                        await prisma.reservas.update({
                             where: { bookingId },
                             data: {
                                 ...bookingData,
@@ -229,7 +229,7 @@ export async function syncWithRateLimit() {
                 logger.info(`  ... y ${stats.errorDetails.length - 10} errores más`);
             }
         }
-        const finalCount = await prisma.booking.count();
+        const finalCount = await prisma.reservas.count();
         logger.info('='.repeat(60));
         logger.info(`📊 TOTAL FINAL EN BD: ${finalCount} reservas`);
         logger.info('='.repeat(60));

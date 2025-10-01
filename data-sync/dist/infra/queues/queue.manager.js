@@ -18,6 +18,13 @@ const QUEUE_CONFIG = {
 export const beds24Queue = new Queue('beds24-sync', QUEUE_CONFIG);
 export const deadLetterQueue = new Queue('beds24-dlq', { connection: redis });
 export const beds24Worker = new Worker('beds24-sync', async (job) => {
+    logger.warn({
+        event: 'WORKER_PROCESSING_JOB',
+        jobId: job.id,
+        jobName: job.name,
+        data: job.data,
+        timestamp: new Date().toISOString()
+    }, `WORKER ACTIVE: Processing job ${job.id}`);
     const { data } = job;
     const startTime = metricsHelpers.recordJobStart(data.type);
     const jobCreatedAt = new Date(job.timestamp);
@@ -60,65 +67,52 @@ export const beds24Worker = new Worker('beds24-sync', async (job) => {
                 webhookType: data.type
             }, '🎯 STEP 6: Processing Beds24 webhook');
             logger.info({ jobId: job.id, bookingId, action }, '🔄 STEP 7: Starting syncSingleBooking call');
-            if (action === 'CREATED' || action === 'MODIFY' || action === 'CANCEL') {
-                if (action === 'MODIFY') {
-                    const actualDelay = jobProcessedAt.getTime() - jobCreatedAt.getTime();
-                    logger.info({
-                        jobId: job.id,
-                        bookingId,
-                        action,
-                        actualDelayMs: actualDelay,
-                        actualDelayMinutes: (actualDelay / 60000).toFixed(2),
-                        expectedDelayMinutes: 3,
-                        delayReason: data.delayReason || 'none'
-                    }, '⏱️ MODIFY action being processed after delay');
-                }
-                logger.info({ jobId: job.id, bookingId, action }, '📡 STEP 8: Calling syncSingleBooking function');
-                const syncResult = await syncSingleBooking(bookingId);
-                logger.info({
+            const actualDelay = jobProcessedAt.getTime() - jobCreatedAt.getTime();
+            logger.info({
+                jobId: job.id,
+                bookingId,
+                actualDelayMs: actualDelay,
+                actualDelayMinutes: (actualDelay / 60000).toFixed(2),
+                expectedDelayMinutes: 1,
+                delayReason: data.delayReason || 'standard-1-minute-delay'
+            }, '⏱️ Processing booking change after delay');
+            logger.info({ jobId: job.id, bookingId }, '📡 STEP 8: Calling syncSingleBooking function');
+            const syncResult = await syncSingleBooking(bookingId);
+            logger.info({
+                jobId: job.id,
+                bookingId,
+                syncResult,
+                success: syncResult.success,
+                action: syncResult.action,
+                table: syncResult.table
+            }, '📋 STEP 9: syncSingleBooking completed');
+            if (!syncResult.success) {
+                logger.error({
                     jobId: job.id,
                     bookingId,
-                    syncResult,
-                    success: syncResult.success,
-                    action: syncResult.action,
-                    table: syncResult.table
-                }, '📋 STEP 9: syncSingleBooking completed');
-                if (!syncResult.success) {
-                    logger.error({
-                        jobId: job.id,
-                        bookingId,
-                        syncResult
-                    }, '❌ STEP 9.1: Sync failed, will throw error');
-                    throw new Error(`Sync failed: ${syncResult.action} - ${syncResult.table}`);
-                }
-                logger.info({ jobId: job.id, bookingId }, '✅ STEP 10: Sync success verified');
-                if (action === 'MODIFY') {
-                    logger.info({ jobId: job.id, bookingId }, '💬 STEP 11: Processing MODIFY messages');
-                    try {
-                        logger.debug({ bookingId }, 'Message sync could be implemented here');
-                    }
-                    catch (msgError) {
-                        logger.warn({
-                            bookingId,
-                            error: msgError.message
-                        }, 'Message sync failed, continuing');
-                    }
-                }
+                    syncResult
+                }, '❌ STEP 9.1: Sync failed, will throw error');
+                throw new Error(`Sync failed: ${syncResult.action} - ${syncResult.table}`);
             }
-            else {
-                logger.warn({
-                    jobId: job.id,
-                    bookingId,
-                    action
-                }, '⚠️ STEP 8.1: Action not in [CREATED, MODIFY, CANCEL] - skipping sync');
-            }
+            logger.info({ jobId: job.id, bookingId }, '✅ STEP 10: Sync success verified');
             logger.info({ jobId: job.id }, '📊 STEP 12: Recording metrics');
             metricsHelpers.recordJobComplete(data.type, startTime, 'success');
+            const processingTime = Date.now() - startTime;
+            logger.info({
+                event: 'JOB_COMPLETED',
+                jobId: job.id,
+                bookingId: bookingId,
+                syncResult: syncResult.action,
+                syncSuccess: syncResult.success,
+                processingTimeMs: processingTime,
+                processingTimeSec: parseFloat((processingTime / 1000).toFixed(2)),
+                timestamp: new Date().toISOString()
+            }, `Job completed: ${bookingId} - ${syncResult.action} in ${(processingTime / 1000).toFixed(2)}s`);
             logger.info({
                 jobId: job.id,
                 bookingId,
                 action,
-                duration: Date.now() - startTime
+                duration: processingTime
             }, '🎉 STEP 13: Beds24 webhook job completed successfully');
         }
         else if (data.type === 'single') {
@@ -183,7 +177,7 @@ export const beds24Worker = new Worker('beds24-sync', async (job) => {
     }
 }, {
     connection: redis,
-    concurrency: 2,
+    concurrency: 1,
     stalledInterval: 30000,
     limiter: {
         max: 5,
@@ -217,7 +211,21 @@ beds24Worker.on('failed', async (job, err) => {
     }
 });
 beds24Worker.on('ready', () => {
-    logger.info('✅ Beds24 worker ready to process jobs');
+    logger.warn({
+        event: 'WORKER_READY',
+        workerName: 'beds24-sync',
+        concurrency: 1,
+        timestamp: new Date().toISOString()
+    }, 'WORKER READY: Beds24 worker initialized and ready to process jobs');
+});
+beds24Worker.on('active', (job) => {
+    logger.warn({
+        event: 'WORKER_JOB_ACTIVE',
+        jobId: job.id,
+        bookingId: job.data.bookingId || 'N/A',
+        jobType: job.data.type,
+        timestamp: new Date().toISOString()
+    }, `WORKER ACTIVE: Job ${job.id} started processing`);
 });
 beds24Worker.on('error', (err) => {
     if (err.message && err.message.includes('Command timed out')) {
@@ -234,36 +242,69 @@ export async function addWebhookJob(data, options) {
         ...data
     };
     const jobId = `beds24-sync-${data.bookingId}`;
-    const existingJob = await beds24Queue.getJob(jobId);
-    if (existingJob && !existingJob.isCompleted() && !existingJob.isFailed()) {
-        if (data.action === 'MODIFY' && options?.delay) {
-            logger.info({
-                bookingId: data.bookingId,
-                existingJobId: existingJob.id,
-                newDelay: options.delay
-            }, 'Cancelling existing job and scheduling new MODIFY with delay');
+    const [existingJob, delayedJobs, activeJobs] = await Promise.all([
+        beds24Queue.getJob(jobId),
+        beds24Queue.getDelayed(),
+        beds24Queue.getActive()
+    ]);
+    const existingDelayed = delayedJobs.find(j => j.id === jobId);
+    const existingActive = activeJobs.find(j => j.id === jobId);
+    if (existingDelayed || existingActive || (existingJob && !existingJob.isCompleted() && !existingJob.isFailed())) {
+        logger.warn({
+            bookingId: data.bookingId,
+            existingJobId: jobId,
+            isDelayed: !!existingDelayed,
+            isActive: !!existingActive,
+            isWaiting: !!(existingJob && !existingJob.isCompleted() && !existingJob.isFailed())
+        }, 'Job already exists for this booking - removing old and creating new');
+        if (existingDelayed)
+            await existingDelayed.remove();
+        if (existingJob)
             await existingJob.remove();
-        }
-        else {
-            logger.debug({ bookingId: data.bookingId, existingJobId: existingJob.id }, 'Skipping duplicate job');
-            return existingJob;
-        }
     }
-    const job = await beds24Queue.add('webhook', jobData, {
-        priority: 1,
-        jobId,
-        ...options,
-    });
-    logger.info({
-        jobId: job.id,
-        bookingId: jobData.bookingId || jobData.payload?.id,
-        action: jobData.action || jobData.payload?.action,
+    logger.warn({
+        event: 'ADDING_JOB_TO_QUEUE',
+        jobId: jobId,
+        bookingId: data.bookingId,
+        queueName: 'beds24-sync',
         delay: options?.delay || 0,
-        delayMinutes: options?.delay ? (options.delay / 60000).toFixed(2) : 0,
-        scheduledFor: options?.delay ? new Date(Date.now() + options.delay).toISOString() : 'immediate',
-        delayReason: jobData.delayReason || 'none'
-    }, 'Webhook job queued');
-    return job;
+        timestamp: new Date().toISOString()
+    }, `ADDING job ${jobId} to queue with delay ${options?.delay || 0}ms`);
+    try {
+        const job = await beds24Queue.add('webhook', jobData, {
+            priority: 1,
+            jobId,
+            ...options,
+        });
+        logger.warn({
+            event: 'JOB_ADDED_TO_QUEUE',
+            jobId: job.id,
+            jobName: job.name,
+            queueName: job.queueName,
+            delay: job.opts.delay || 0,
+            timestamp: new Date().toISOString()
+        }, `JOB ADDED: ${job.id} to queue ${job.queueName}`);
+        logger.info({
+            jobId: job.id,
+            bookingId: jobData.bookingId || jobData.payload?.id,
+            action: jobData.action || jobData.payload?.action,
+            delay: options?.delay || 0,
+            delayMinutes: options?.delay ? (options.delay / 60000).toFixed(2) : 0,
+            scheduledFor: options?.delay ? new Date(Date.now() + options.delay).toISOString() : 'immediate',
+            delayReason: jobData.delayReason || 'none'
+        }, 'Webhook job queued');
+        return job;
+    }
+    catch (error) {
+        logger.error({
+            event: 'JOB_ADD_FAILED',
+            jobId: jobId,
+            error: error.message,
+            stack: error.stack,
+            timestamp: new Date().toISOString()
+        }, `FAILED to add job ${jobId}: ${error.message}`);
+        throw error;
+    }
 }
 export async function addSingleSyncJob(data, options) {
     const jobData = { type: 'single', ...data };

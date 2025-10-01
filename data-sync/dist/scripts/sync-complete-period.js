@@ -17,7 +17,7 @@ export async function syncCompletePeriod() {
     logger.info('='.repeat(60));
     try {
         logger.info('📊 PASO 1: Analizando BD actual...');
-        const existingBookings = await prisma.booking.findMany({
+        const existingBookings = await prisma.reservas.findMany({
             select: {
                 bookingId: true,
                 guestName: true,
@@ -25,7 +25,7 @@ export async function syncCompletePeriod() {
                 status: true
             }
         });
-        const existingIds = new Set(existingBookings.map(b => b.bookingId));
+        const existingIds = new Set(existingBookings.map((b) => b.bookingId));
         stats.existingInDB = existingIds.size;
         logger.info(`📊 Reservas actuales en BD: ${stats.existingInDB}`);
         logger.info('📥 PASO 2: Descargando TODAS las reservas de Beds24...');
@@ -148,7 +148,7 @@ export async function syncCompletePeriod() {
                 logger.error(`  - ${err.bookingId}: ${err.error}`);
             });
         }
-        const finalCount = await prisma.booking.count();
+        const finalCount = await prisma.reservas.count();
         logger.info('='.repeat(60));
         logger.info(`📊 TOTAL FINAL EN BD: ${finalCount} reservas`);
         logger.info('='.repeat(60));

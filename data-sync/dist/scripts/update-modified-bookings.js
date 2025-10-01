@@ -44,7 +44,7 @@ export async function updateModifiedBookings(options = {}) {
             const promises = batch.map(async (booking) => {
                 try {
                     stats.checked++;
-                    const existing = await prisma.booking.findUnique({
+                    const existing = await prisma.reservas.findUnique({
                         where: { bookingId: String(booking.id) },
                         select: {
                             id: true,

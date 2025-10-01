@@ -28,13 +28,7 @@ export function registerBeds24Webhook(router) {
                 timestamp: new Date().toISOString()
             });
             const bookingId = payload.id || payload.booking?.id || payload.bookingId;
-            let action = payload.action || 'MODIFY';
-            if (action === 'created')
-                action = 'CREATED';
-            if (action === 'modified')
-                action = 'MODIFY';
-            if (action === 'cancelled')
-                action = 'CANCEL';
+            const action = 'MODIFY';
             if (!bookingId) {
                 logger.warn({ payload }, 'Beds24 webhook missing booking ID, skipping');
                 return;
@@ -46,48 +40,18 @@ export function registerBeds24Webhook(router) {
                 payload: payload
             }, 'Beds24 webhook received');
             metricsHelpers.recordWebhook('beds24', action.toLowerCase());
-            const hasMessages = payload.messages && Array.isArray(payload.messages) && payload.messages.length > 0;
-            const isMessageUpdate = action === 'MODIFY' && hasMessages;
-            let jobDelay = 0;
-            let delayReason = 'immediate';
-            if (action === 'MODIFY') {
-                if (isMessageUpdate) {
-                    jobDelay = 0;
-                    delayReason = 'immediate-message-update';
-                    logger.info({
-                        bookingId,
-                        action,
-                        messageCount: payload.messages?.length || 0,
-                        lastMessage: payload.messages?.[payload.messages.length - 1]?.message?.substring(0, 50) || 'N/A',
-                        lastMessageSource: payload.messages?.[payload.messages.length - 1]?.source || 'unknown'
-                    }, '💬 MODIFY with messages - processing immediately');
-                }
-                else {
-                    jobDelay = 180000;
-                    delayReason = '3-minute-delay-for-data-modifications';
-                    logger.info({
-                        bookingId,
-                        action,
-                        delayMinutes: 3,
-                        delayMs: jobDelay,
-                        scheduledFor: new Date(Date.now() + jobDelay).toISOString(),
-                        modificationType: 'data-update'
-                    }, '⏰ MODIFY without messages - scheduled for 3 minutes delay');
-                }
-            }
-            else if (action === 'CREATED') {
-                logger.info({
-                    bookingId,
-                    action
-                }, '🚀 CREATED webhook will be processed immediately');
-            }
-            else if (action === 'CANCEL') {
-                logger.info({
-                    bookingId,
-                    action
-                }, '❌ CANCEL webhook will be processed immediately');
-            }
-            const jobOptions = jobDelay > 0 ? { delay: jobDelay } : {};
+            const jobDelay = 60000;
+            logger.info({
+                event: 'WEBHOOK_RECEIVED',
+                bookingId: bookingId,
+                action: action,
+                delayMs: jobDelay,
+                scheduledFor: new Date(Date.now() + jobDelay).toISOString(),
+                messageCount: payload.messages?.length || 0,
+                propertyId: payload.propertyId || payload.booking?.propertyId,
+                timestamp: new Date().toISOString()
+            }, `Webhook received for booking ${bookingId}, scheduled for processing`);
+            const jobOptions = { delay: jobDelay };
             const job = await addWebhookJob({
                 bookingId: bookingId,
                 action: action,
@@ -96,7 +60,7 @@ export function registerBeds24Webhook(router) {
                     action: action,
                     fullPayload: payload
                 },
-                delayReason: delayReason,
+                delayReason: '1-minute-standard-delay',
                 scheduledFor: jobDelay > 0 ? new Date(Date.now() + jobDelay).toISOString() : null
             }, jobOptions);
             logger.info({
@@ -104,7 +68,7 @@ export function registerBeds24Webhook(router) {
                 bookingId,
                 action,
                 delay: jobDelay,
-                delayReason: delayReason,
+                delayReason: '1-minute-standard-delay',
                 scheduledFor: jobDelay > 0 ? new Date(Date.now() + jobDelay).toISOString() : 'immediate'
             }, 'Beds24 webhook job queued');
         }

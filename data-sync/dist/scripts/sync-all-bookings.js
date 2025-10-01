@@ -4,14 +4,14 @@ import { logger } from '../utils/logger.js';
 import { syncSingleBooking } from '../providers/beds24/sync.js';
 async function getDatabaseStats() {
     logger.info('📊 FASE 0: Analizando estado actual de la BD...');
-    const totalBookings = await prisma.booking.count();
-    const bookingIds = await prisma.booking.findMany({
+    const totalBookings = await prisma.reservas.count();
+    const bookingIds = await prisma.reservas.findMany({
         select: { bookingId: true, modifiedDate: true },
         orderBy: { modifiedDate: 'desc' },
         take: 5
     });
     const lastModified = bookingIds[0]?.modifiedDate || 'never';
-    const dateRange = await prisma.booking.aggregate({
+    const dateRange = await prisma.reservas.aggregate({
         _min: { arrivalDate: true },
         _max: { departureDate: true }
     });
@@ -20,14 +20,14 @@ async function getDatabaseStats() {
         lastModified,
         earliestArrival: dateRange._min.arrivalDate,
         latestDeparture: dateRange._max.departureDate,
-        sampleIds: bookingIds.map(b => b.bookingId)
+        sampleIds: bookingIds.map((b) => b.bookingId)
     }, '📊 Estado actual de la BD');
     return {
         totalBookings,
         lastModified,
-        existingIds: new Set(await prisma.booking.findMany({
+        existingIds: new Set(await prisma.reservas.findMany({
             select: { bookingId: true }
-        }).then(books => books.map(b => b.bookingId)))
+        }).then((books) => books.map((b) => b.bookingId)))
     };
 }
 async function syncNewBookings(existingIds) {
@@ -219,7 +219,7 @@ async function syncCancelledBookings() {
         for (const booking of bookings) {
             try {
                 result.processed++;
-                const existing = await prisma.booking.findUnique({
+                const existing = await prisma.reservas.findUnique({
                     where: { bookingId: String(booking.id) },
                     select: { id: true, status: true }
                 });
@@ -286,7 +286,7 @@ export async function executeSmartSync() {
         logger.info(`📝 Total actualizadas: ${totalUpdated}`);
         logger.info(`❌ Total errores: ${totalErrors}`);
         logger.info('='.repeat(60));
-        const finalCount = await prisma.booking.count();
+        const finalCount = await prisma.reservas.count();
         logger.info(`📊 Total reservas en BD: ${finalCount}`);
         return {
             success: true,

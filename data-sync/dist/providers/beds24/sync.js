@@ -109,16 +109,27 @@ export async function processSingleBookingData(bookingData) {
             logger.info({ bookingId }, '✅ PROCESS STEP 5.2: Booking data validation passed');
         }
         logger.info({ bookingId }, '🔍 PROCESS STEP 6: Checking if booking exists in BD');
-        const existing = await prisma.booking.findUnique({
+        const existing = await prisma.reservas.findUnique({
             where: { bookingId }
         });
+        if (existing && existing.lastUpdatedBD) {
+            const timeSinceLastUpdate = Date.now() - new Date(existing.lastUpdatedBD).getTime();
+            if (timeSinceLastUpdate < 2 * 60 * 1000) {
+                logger.warn({
+                    bookingId,
+                    lastUpdatedBD: existing.lastUpdatedBD,
+                    secondsSinceUpdate: Math.floor(timeSinceLastUpdate / 1000)
+                }, 'Booking was recently updated - skipping to avoid duplicate processing');
+                return { success: true, action: 'skipped', table: 'Booking' };
+            }
+        }
         logger.info({
             bookingId,
             existsInDB: !!existing,
             willCreateNew: !existing
         }, '📊 PROCESS STEP 7: Database check completed');
         logger.info({ bookingId }, '💾 PROCESS STEP 8: Starting database upsert operation');
-        const result = await prisma.booking.upsert({
+        const result = await prisma.reservas.upsert({
             where: { bookingId },
             create: validatedData,
             update: {
@@ -126,21 +137,37 @@ export async function processSingleBookingData(bookingData) {
                 id: undefined,
             },
         });
+        const dbAction = existing ? 'UPDATE' : 'INSERT';
         logger.info({
-            bookingId,
-            dbResultId: result.id,
-            wasCreated: !existing
-        }, '✅ PROCESS STEP 9: Database upsert completed');
+            event: 'DB_OPERATION_SUCCESS',
+            operation: 'UPSERT',
+            action: dbAction,
+            bookingId: bookingId,
+            dbId: result.id,
+            wasExisting: !!existing,
+            timestamp: new Date().toISOString()
+        }, `Database ${dbAction} completed for booking ${bookingId}`);
         logger.info({
-            bookingId,
-            action: existing ? 'updated' : 'created',
-            table: 'Booking',
-            resultId: result.id,
+            event: 'BOOKING_DATA_SAVED',
+            bookingId: bookingId,
+            dbId: result.id,
             guestName: result.guestName,
-            phone: result.phone,
+            propertyName: result.propertyName,
             status: result.status,
-            bdStatus: result.BDStatus
-        }, '🎉 PROCESS STEP 10: Successfully synced to BD - Booking table');
+            bdStatus: result.BDStatus,
+            arrivalDate: result.arrivalDate,
+            departureDate: result.departureDate,
+            numNights: result.numNights,
+            totalPersons: result.totalPersons,
+            totalCharges: result.totalCharges,
+            totalPayments: result.totalPayments,
+            balance: result.balance,
+            phone: result.phone || null,
+            email: result.email || null,
+            channel: result.channel,
+            lastUpdatedBD: result.lastUpdatedBD,
+            timestamp: new Date().toISOString()
+        }, `Booking data saved: ${bookingId} - ${result.guestName}`);
         const finalResult = { success: true, action: existing ? 'updated' : 'created', table: 'Booking' };
         logger.info({ bookingId, finalResult }, '🏁 PROCESS STEP 11: Returning success result');
         return finalResult;
@@ -148,23 +175,23 @@ export async function processSingleBookingData(bookingData) {
     catch (error) {
         const bookingId = (bookingData?.bookingId || bookingData?.id)?.toString() || 'unknown';
         logger.error({
-            bookingId,
-            error: error.message,
+            event: 'DB_OPERATION_FAILED',
+            bookingId: bookingId,
+            errorCode: error.code || 'UNKNOWN',
+            errorMessage: error.message,
+            errorType: error.code === 'P2002' ? 'UNIQUE_CONSTRAINT_VIOLATION' : 'DATABASE_ERROR',
             stack: error.stack,
-            data: bookingData,
-            constraint: error.code === 'P2002' ? 'unique_constraint' : error.code
-        }, '💥 PROCESS ERROR: Failed to sync to BD - check constraints and data');
-        const errorResult = { success: false, action: 'skipped', table: 'Booking' };
-        logger.info({ bookingId, errorResult }, '🚫 PROCESS STEP 12: Returning error result');
-        return errorResult;
+            timestamp: new Date().toISOString()
+        }, `Database operation failed for booking ${bookingId}: ${error.message}`);
+        return { success: false, action: 'skipped', table: 'Booking' };
     }
 }
 async function syncCancelledBooking(bookingData) {
     try {
-        const existing = await prisma.booking.findUnique({
+        const existing = await prisma.reservas.findUnique({
             where: { bookingId: bookingData.bookingId }
         });
-        await prisma.booking.upsert({
+        await prisma.reservas.upsert({
             where: { bookingId: bookingData.bookingId },
             create: {
                 ...bookingData,
@@ -186,10 +213,10 @@ async function syncCancelledBooking(bookingData) {
 }
 async function syncActiveBooking(bookingData) {
     try {
-        const existingBooking = await prisma.booking.findUnique({
+        const existingBooking = await prisma.reservas.findUnique({
             where: { bookingId: bookingData.bookingId }
         });
-        const activeResult = await prisma.booking.upsert({
+        const activeResult = await prisma.reservas.upsert({
             where: { bookingId: bookingData.bookingId },
             create: bookingData,
             update: {

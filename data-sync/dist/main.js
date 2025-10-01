@@ -37,8 +37,41 @@ async function main() {
     catch (error) {
         logger.warn({ error: error.message }, '⚠️ Beds24 write operations will not be available - continuing without write auth');
     }
+    logger.info('🧹 Cleaning old jobs from queue...');
+    const { beds24Queue } = await import('./infra/queues/queue.manager.js');
+    const delayedJobs = await beds24Queue.getDelayed();
+    let removedCount = 0;
+    for (const job of delayedJobs) {
+        const jobAge = Date.now() - job.timestamp;
+        if (jobAge > 5 * 60 * 1000) {
+            await job.remove();
+            removedCount++;
+            logger.info({
+                jobId: job.id,
+                age: Math.floor(jobAge / 1000) + 's'
+            }, `Removed old delayed job: ${job.id}`);
+        }
+    }
+    if (removedCount > 0) {
+        logger.info({ count: removedCount }, `Cleaned ${removedCount} old delayed jobs`);
+    }
     logger.info('🔄 Starting BullMQ worker...');
     logger.info('✅ BullMQ worker started successfully');
+    setInterval(async () => {
+        const { beds24Queue } = await import('./infra/queues/queue.manager.js');
+        const waiting = await beds24Queue.getWaitingCount();
+        const active = await beds24Queue.getActiveCount();
+        const completed = await beds24Queue.getCompletedCount();
+        const failed = await beds24Queue.getFailedCount();
+        logger.info({
+            event: 'QUEUE_STATUS_CHECK',
+            waiting,
+            active,
+            completed,
+            failed,
+            timestamp: new Date().toISOString()
+        }, `Queue status - Waiting: ${waiting}, Active: ${active}, Completed: ${completed}, Failed: ${failed}`);
+    }, 30000);
     const router = express.Router();
     registerHealthRoute(router);
     registerBeds24Webhook(router);

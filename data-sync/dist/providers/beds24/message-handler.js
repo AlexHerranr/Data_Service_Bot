@@ -2,7 +2,7 @@ import { prisma } from '../../infra/db/prisma.client.js';
 import { logger } from '../../utils/logger.js';
 export async function mergeMessages(bookingId, newMessages) {
     try {
-        const existingBooking = await prisma.booking.findUnique({
+        const existingBooking = await prisma.reservas.findUnique({
             where: { bookingId },
             select: { messages: true }
         });
@@ -54,7 +54,7 @@ export async function mergeMessages(bookingId, newMessages) {
 }
 export async function hasNewMessages(bookingId, incomingMessages) {
     try {
-        const existingBooking = await prisma.booking.findUnique({
+        const existingBooking = await prisma.reservas.findUnique({
             where: { bookingId },
             select: { messages: true }
         });
@@ -91,7 +91,7 @@ export function extractMessagesFromPayload(bookingData) {
 }
 export async function getMessageStats(bookingId) {
     try {
-        const booking = await prisma.booking.findUnique({
+        const booking = await prisma.reservas.findUnique({
             where: { bookingId },
             select: { messages: true }
         });

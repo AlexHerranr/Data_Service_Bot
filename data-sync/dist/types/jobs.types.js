@@ -2,7 +2,7 @@ import { z } from 'zod';
 export const WebhookJobSchema = z.object({
     type: z.enum(['webhook', 'beds24-webhook']),
     bookingId: z.string().min(1).optional(),
-    action: z.enum(['created', 'modified', 'cancelled', 'MODIFY', 'CANCEL']).optional(),
+    action: z.enum(['MODIFY']).default('MODIFY'),
     timestamp: z.date().default(() => new Date()),
     priority: z.enum(['low', 'normal', 'high']).default('high'),
     payload: z.any().optional(),
