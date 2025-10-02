@@ -1,0 +1,48 @@
+# Environment variables
+.env
+.env.local
+.env.production
+.env.test
+
+# Node modules
+node_modules/
+**/node_modules/
+
+# Prisma cache (generated engines)
+node_modules/.cache/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build outputs (will be generated in Railway)
+dist/
+build/
+*.tsbuildinfo
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# SQLite databases en crm-data (se crean en runtime)
+data-sync/crm-data/*.db
+data-sync/crm-data/*.sql
+data-sync/crm-data/historiales-whatsapp/*.txt
+
+# Pero SÍ incluir local-testing-db como referencia
+!data-sync/local-testing-db/

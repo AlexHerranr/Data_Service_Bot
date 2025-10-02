@@ -49,7 +49,14 @@
       "Bash(railway service:*)",
       "Bash(npx prisma:*)",
       "Bash(PRISMA_CLIENT_OUTPUT=./node_modules/.prisma/client node ../temp-check-bookings.js)",
-      "Bash(rg:*)"
+      "Bash(rg:*)",
+      "Bash(git fetch:*)",
+      "Read(//c/Users/alex-/Bot-Wsp-Whapi-IA/**)",
+      "Bash(DATABASE_URL=\"postgresql://postgres:slTVdKuHwjEfvxJEjGtMVTwSTYzdbfuR@turntable.proxy.rlwy.net:43146/railway\" node export-reservas-to-local.cjs)",
+      "Read(//c/**)",
+      "Bash(sqlite3:*)",
+      "Bash(tree:*)",
+      "WebSearch"
     ],
     "defaultMode": "acceptEdits"
   }
